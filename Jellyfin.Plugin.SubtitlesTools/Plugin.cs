@@ -57,7 +57,7 @@ public sealed class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             },
             new PluginPageInfo
             {
-                Name = "subtitlesToolsjs",
+                Name = "subtitlesToolsjsv2",
                 EmbeddedResourcePath = string.Format(
                     CultureInfo.InvariantCulture,
                     "{0}.Web.subtitlesTools.js",

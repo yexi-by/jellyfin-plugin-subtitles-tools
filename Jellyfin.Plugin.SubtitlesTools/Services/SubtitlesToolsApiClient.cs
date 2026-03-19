@@ -19,37 +19,35 @@ public sealed class SubtitlesToolsApiClient
     /// <summary>
     /// 复用的 HTTP 客户端名称。
     /// </summary>
-    public const string HttpClientName = "SubtitlesTools";
-
     private static readonly JsonSerializerOptions JsonSerializerOptions = new(JsonSerializerDefaults.Web);
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly HttpClient _httpClient;
     private readonly ILogger<SubtitlesToolsApiClient> _logger;
     private readonly Func<PluginConfiguration> _configurationAccessor;
 
     /// <summary>
     /// 初始化服务端客户端。
     /// </summary>
-    /// <param name="httpClientFactory">HTTP 客户端工厂。</param>
+    /// <param name="httpClient">HTTP 客户端。</param>
     /// <param name="logger">日志器。</param>
     public SubtitlesToolsApiClient(
-        IHttpClientFactory httpClientFactory,
+        HttpClient httpClient,
         ILogger<SubtitlesToolsApiClient> logger)
-        : this(httpClientFactory, logger, GetPluginConfiguration)
+        : this(httpClient, logger, GetPluginConfiguration)
     {
     }
 
     /// <summary>
     /// 仅供测试或特殊场景替换配置读取方式。
     /// </summary>
-    /// <param name="httpClientFactory">HTTP 客户端工厂。</param>
+    /// <param name="httpClient">HTTP 客户端。</param>
     /// <param name="logger">日志器。</param>
     /// <param name="configurationAccessor">配置访问器。</param>
     internal SubtitlesToolsApiClient(
-        IHttpClientFactory httpClientFactory,
+        HttpClient httpClient,
         ILogger<SubtitlesToolsApiClient> logger,
         Func<PluginConfiguration> configurationAccessor)
     {
-        _httpClientFactory = httpClientFactory;
+        _httpClient = httpClient;
         _logger = logger;
         _configurationAccessor = configurationAccessor;
     }
@@ -171,15 +169,15 @@ public sealed class SubtitlesToolsApiClient
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        var client = _httpClientFactory.CreateClient(HttpClientName);
-        client.Timeout = TimeSpan.FromSeconds(configuration.RequestTimeoutSeconds);
+        using var timeoutCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(configuration.RequestTimeoutSeconds));
 
         try
         {
-            var response = await client.SendAsync(
+            var response = await _httpClient.SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken).ConfigureAwait(false);
+                timeoutCancellationTokenSource.Token).ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
             {
@@ -195,7 +193,8 @@ public sealed class SubtitlesToolsApiClient
                     (int)response.StatusCode,
                     string.IsNullOrWhiteSpace(body) ? "[empty]" : body));
         }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException ex)
+            when (timeoutCancellationTokenSource.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(ex, "访问 Python 服务超时。");
             throw new SubtitlesToolsApiException("访问 Python 服务超时。", ex);

@@ -19,6 +19,21 @@ function setButtonsDisabled(page, disabled) {
     page.querySelector('#saveButton').disabled = disabled;
 }
 
+function readValue(source, keys, fallback = '') {
+    if (!source) {
+        return fallback;
+    }
+
+    for (const key of keys) {
+        const value = source[key];
+        if (value !== undefined && value !== null && value !== '') {
+            return value;
+        }
+    }
+
+    return fallback;
+}
+
 export default function (view) {
     view.addEventListener('viewshow', function () {
         Dashboard.showLoadingMsg();
@@ -46,21 +61,25 @@ export default function (view) {
             setButtonsDisabled(view, false);
 
             if (response.ok) {
-                const health = body.Health || {};
+                const health = body.Health || body.health || {};
+                const version = readValue(health, ['Version', 'version']);
+                const providerName = readValue(health, ['ProviderName', 'providerName', 'provider_name']);
                 setMessage(
                     messageElement,
-                    `连接成功。版本：${health.Version || '-'}，字幕源：${health.ProviderName || '-'}。`,
+                    `连接成功。版本：${version || '-'}，字幕源：${providerName || '-'}。`,
                     false);
                 return;
             }
 
-            setMessage(messageElement, body.Message || '连接失败。', true);
-            Dashboard.processErrorResponse({ statusText: body.Message || '连接失败。' });
+            const errorMessage = readValue(body, ['Message', 'message'], '连接失败。');
+            setMessage(messageElement, errorMessage, true);
+            Dashboard.processErrorResponse({ statusText: errorMessage });
         }).catch(() => {
             Dashboard.hideLoadingMsg();
             setButtonsDisabled(view, false);
-            setMessage(messageElement, '连接失败，请检查地址、网络或服务状态。', true);
-            Dashboard.processErrorResponse({ statusText: '连接失败，请检查地址、网络或服务状态。' });
+            const errorMessage = '连接失败，请检查地址、网络或服务状态。';
+            setMessage(messageElement, errorMessage, true);
+            Dashboard.processErrorResponse({ statusText: errorMessage });
         });
     });
 

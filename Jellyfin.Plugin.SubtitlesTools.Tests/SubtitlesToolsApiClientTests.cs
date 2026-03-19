@@ -36,7 +36,7 @@ public sealed class SubtitlesToolsApiClientTests
 
         using var httpClient = new HttpClient(handler);
         var apiClient = new SubtitlesToolsApiClient(
-            new TestHttpClientFactory(httpClient),
+            httpClient,
             NullLogger<SubtitlesToolsApiClient>.Instance,
             () => new PluginConfiguration
             {
@@ -78,7 +78,7 @@ public sealed class SubtitlesToolsApiClientTests
 
         using var httpClient = new HttpClient(handler);
         var apiClient = new SubtitlesToolsApiClient(
-            new TestHttpClientFactory(httpClient),
+            httpClient,
             NullLogger<SubtitlesToolsApiClient>.Instance,
             () => new PluginConfiguration());
 

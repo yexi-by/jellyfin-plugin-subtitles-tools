@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Net.Http.Headers;
 using Jellyfin.Plugin.SubtitlesTools.Services;
 using MediaBrowser.Controller;
@@ -15,20 +16,20 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        serviceCollection
-            .AddHttpClient(SubtitlesToolsApiClient.HttpClientName, client =>
-            {
-                client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue(
-                        applicationHost.Name.Replace(' ', '_'),
-                        applicationHost.ApplicationVersionString));
-                client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue(
-                        "Jellyfin-Plugin-SubtitlesTools",
-                        typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.1.0.0"));
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
-            });
-
+        serviceCollection.AddSingleton(_ =>
+        {
+            var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.UserAgent.Add(
+                new ProductInfoHeaderValue(
+                    applicationHost.Name.Replace(' ', '_'),
+                    applicationHost.ApplicationVersionString));
+            httpClient.DefaultRequestHeaders.UserAgent.Add(
+                new ProductInfoHeaderValue(
+                    "Jellyfin-Plugin-SubtitlesTools",
+                    typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.1.0.0"));
+            httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+            return httpClient;
+        });
         serviceCollection.AddSingleton<VideoHashCalculator>();
         serviceCollection.AddSingleton<VideoHashCacheService>();
         serviceCollection.AddSingleton<SubtitlesToolsApiClient>();
