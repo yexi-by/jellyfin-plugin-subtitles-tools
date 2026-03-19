@@ -26,13 +26,18 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             httpClient.DefaultRequestHeaders.UserAgent.Add(
                 new ProductInfoHeaderValue(
                     "Jellyfin-Plugin-SubtitlesTools",
-                    typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.1.1.0"));
+                    typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.1.2.0"));
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
             return httpClient;
         });
         serviceCollection.AddSingleton<VideoHashCalculator>();
         serviceCollection.AddSingleton<VideoHashCacheService>();
+        serviceCollection.AddSingleton<VideoHashResolverService>();
+        serviceCollection.AddSingleton<VideoHashBackfillService>();
         serviceCollection.AddSingleton<SubtitlesToolsApiClient>();
+        serviceCollection.AddSingleton<PrecomputeMissingHashesScheduledTask>();
+        serviceCollection.AddSingleton<VideoHashPrecomputeService>();
+        serviceCollection.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<VideoHashPrecomputeService>());
         serviceCollection.AddSingleton<ISubtitleProvider, SubtitlesToolsSubtitleProvider>();
     }
 }

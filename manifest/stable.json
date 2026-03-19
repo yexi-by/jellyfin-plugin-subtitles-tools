@@ -10,12 +10,12 @@
     "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
     "versions": [
       {
-        "version": "0.1.1.0",
-        "changelog": "修复 Jellyfin 10.11.6 下的插件加载失败问题，清理错误依赖；修复配置页测试连接的结果展示，并刷新配置页前端资源缓存。",
+        "version": "0.1.2.0",
+        "changelog": "新增视频哈希预计算能力：可在配置页开启新增媒体自动预计算，并新增手动计划任务补算缺失 GCID/CID；同时保留可配置并发数，默认 1。",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.1.1.0/Jellyfin.Plugin.SubtitlesTools_0.1.1.0.zip",
-        "checksum": "8EB65A99BE9CD6162C460C336EAC58DC",
-        "timestamp": "2026-03-19T19:13:22Z"
+        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.1.2.0/Jellyfin.Plugin.SubtitlesTools_0.1.2.0.zip",
+        "checksum": "53E55994919BE13758985559CAA3EC37",
+        "timestamp": "2026-03-19T20:07:00Z"
       }
     ]
   }

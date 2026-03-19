@@ -10,7 +10,9 @@ function setMessage(element, text, isError) {
 function readForm(page) {
     return {
         ServiceBaseUrl: page.querySelector('#serviceBaseUrl').value.trim(),
-        RequestTimeoutSeconds: Number.parseInt(page.querySelector('#requestTimeoutSeconds').value, 10) || 10
+        RequestTimeoutSeconds: Number.parseInt(page.querySelector('#requestTimeoutSeconds').value, 10) || 10,
+        EnableAutoHashPrecompute: page.querySelector('#enableAutoHashPrecompute').checked,
+        HashPrecomputeConcurrency: Number.parseInt(page.querySelector('#hashPrecomputeConcurrency').value, 10) || 1
     };
 }
 
@@ -40,6 +42,8 @@ export default function (view) {
         ApiClient.getPluginConfiguration(SubtitlesToolsConfig.pluginUniqueId).then(config => {
             view.querySelector('#serviceBaseUrl').value = config.ServiceBaseUrl || 'http://127.0.0.1:8055';
             view.querySelector('#requestTimeoutSeconds').value = config.RequestTimeoutSeconds || 10;
+            view.querySelector('#enableAutoHashPrecompute').checked = !!config.EnableAutoHashPrecompute;
+            view.querySelector('#hashPrecomputeConcurrency').value = config.HashPrecomputeConcurrency || 1;
             setMessage(view.querySelector('#testConnectionMessage'), '', false);
             Dashboard.hideLoadingMsg();
         }).catch(() => {
@@ -50,7 +54,11 @@ export default function (view) {
 
     view.querySelector('#testConnectionButton').addEventListener('click', function () {
         const messageElement = view.querySelector('#testConnectionMessage');
-        const payload = JSON.stringify(readForm(view));
+        const formValue = readForm(view);
+        const payload = JSON.stringify({
+            ServiceBaseUrl: formValue.ServiceBaseUrl,
+            RequestTimeoutSeconds: formValue.RequestTimeoutSeconds
+        });
         const url = ApiClient.getUrl('Jellyfin.Plugin.SubtitlesTools/TestConnection');
 
         setButtonsDisabled(view, true);
@@ -92,6 +100,8 @@ export default function (view) {
             const formValue = readForm(view);
             config.ServiceBaseUrl = formValue.ServiceBaseUrl;
             config.RequestTimeoutSeconds = formValue.RequestTimeoutSeconds;
+            config.EnableAutoHashPrecompute = formValue.EnableAutoHashPrecompute;
+            config.HashPrecomputeConcurrency = formValue.HashPrecomputeConcurrency;
 
             return ApiClient.updatePluginConfiguration(SubtitlesToolsConfig.pluginUniqueId, config);
         }).then(result => {

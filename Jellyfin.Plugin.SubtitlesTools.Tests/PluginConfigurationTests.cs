@@ -42,4 +42,32 @@ public sealed class PluginConfigurationTests
 
         Assert.Equal(expected, value);
     }
+
+    /// <summary>
+    /// 预计算并发数应被限制在安全范围内，避免一次性拉高太多文件读取并发。
+    /// </summary>
+    [Theory]
+    [InlineData(-1, 1)]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(4, 4)]
+    [InlineData(999, 8)]
+    public void NormalizeHashPrecomputeConcurrency_ShouldClampValue(int input, int expected)
+    {
+        var value = PluginConfiguration.NormalizeHashPrecomputeConcurrency(input);
+
+        Assert.Equal(expected, value);
+    }
+
+    /// <summary>
+    /// 默认配置应关闭自动预计算，并把预计算并发数设为 1。
+    /// </summary>
+    [Fact]
+    public void Constructor_ShouldUseExpectedPrecomputeDefaults()
+    {
+        var configuration = new PluginConfiguration();
+
+        Assert.False(configuration.EnableAutoHashPrecompute);
+        Assert.Equal(1, configuration.HashPrecomputeConcurrency);
+    }
 }

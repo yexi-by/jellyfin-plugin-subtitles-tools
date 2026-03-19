@@ -23,6 +23,23 @@
                     <div class="fieldDescription">建议保持 10 秒，网络或磁盘较慢时可适当增大。</div>
                 </div>
 
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" id="enableAutoHashPrecompute" type="checkbox" />
+                        <span>新增媒体入库后自动预计算视频哈希</span>
+                    </label>
+                    <div class="fieldDescription">
+                        默认关闭。开启后仅处理 Movie 和 Episode，且只处理本地可直接读取的媒体文件。
+                    </div>
+                </div>
+
+                <div class="inputContainer">
+                    <input is="emby-input" id="hashPrecomputeConcurrency" type="number" min="1" max="8" label="视频哈希预计算并发数" />
+                    <div class="fieldDescription">
+                        默认 1。网络盘建议保持 1，本地 SSD 可根据机器性能适当提高。手动补算入口在 Jellyfin 的“计划任务”页面。
+                    </div>
+                </div>
+
                 <div class="fieldDescription" id="testConnectionMessage"></div>
 
                 <div class="formDialogFooter flex align-items-center">

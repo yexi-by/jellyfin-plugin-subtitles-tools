@@ -68,3 +68,34 @@ public sealed class VideoHashCacheEntry
     [JsonPropertyName("gcid")]
     public string Gcid { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// 描述一次视频哈希解析过程的缓存命中情况与各阶段耗时。
+/// </summary>
+public sealed class VideoHashResolutionMetrics
+{
+    /// <summary>
+    /// 获取或设置最终得到的视频哈希结果。
+    /// </summary>
+    public VideoHashResult HashResult { get; set; } = new();
+
+    /// <summary>
+    /// 获取或设置是否直接命中了现有缓存。
+    /// </summary>
+    public bool CacheHit { get; set; }
+
+    /// <summary>
+    /// 获取或设置缓存读取耗时，单位为毫秒。
+    /// </summary>
+    public double CacheLookupMs { get; set; }
+
+    /// <summary>
+    /// 获取或设置实际计算耗时，单位为毫秒。
+    /// </summary>
+    public double ComputeMs { get; set; }
+
+    /// <summary>
+    /// 获取或设置缓存写回耗时，单位为毫秒。
+    /// </summary>
+    public double CacheSaveMs { get; set; }
+}

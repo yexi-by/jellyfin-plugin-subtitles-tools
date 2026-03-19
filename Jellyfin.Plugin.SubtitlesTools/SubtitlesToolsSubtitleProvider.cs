@@ -17,17 +17,10 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools;
 
 /// <summary>
-/// 通过 Python 服务端搜索和下载字幕的 Jellyfin 字幕提供器。
+/// 通过 Python 服务端搜索和下载字幕，并接入 Jellyfin 原生字幕提供器接口。
 /// </summary>
 public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
 {
-    private readonly record struct HashResolutionMetrics(
-        VideoHashResult HashResult,
-        bool CacheHit,
-        double CacheLookupMs,
-        double ComputeMs,
-        double CacheSaveMs);
-
     private static readonly VideoContentType[] SupportedTypes =
     [
         VideoContentType.Episode,
@@ -73,8 +66,7 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
     ];
 
     private readonly SubtitlesToolsApiClient _apiClient;
-    private readonly VideoHashCalculator _videoHashCalculator;
-    private readonly VideoHashCacheService _videoHashCacheService;
+    private readonly VideoHashResolverService _videoHashResolverService;
     private readonly ILogger<SubtitlesToolsSubtitleProvider> _logger;
     private readonly ConcurrentDictionary<string, SubtitleSnapshot> _subtitleSnapshotCache = new(StringComparer.Ordinal);
 
@@ -82,18 +74,15 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
     /// 初始化字幕提供器。
     /// </summary>
     /// <param name="apiClient">Python 服务端客户端。</param>
-    /// <param name="videoHashCalculator">视频哈希计算器。</param>
-    /// <param name="videoHashCacheService">视频哈希缓存服务。</param>
-    /// <param name="logger">日志器。</param>
+    /// <param name="videoHashResolverService">视频哈希解析服务。</param>
+    /// <param name="logger">日志记录器。</param>
     public SubtitlesToolsSubtitleProvider(
         SubtitlesToolsApiClient apiClient,
-        VideoHashCalculator videoHashCalculator,
-        VideoHashCacheService videoHashCacheService,
+        VideoHashResolverService videoHashResolverService,
         ILogger<SubtitlesToolsSubtitleProvider> logger)
     {
         _apiClient = apiClient;
-        _videoHashCalculator = videoHashCalculator;
-        _videoHashCacheService = videoHashCacheService;
+        _videoHashResolverService = videoHashResolverService;
         _logger = logger;
     }
 
@@ -137,10 +126,12 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
         }
 
         VideoHashResult hashResult;
-        HashResolutionMetrics hashMetrics;
+        VideoHashResolutionMetrics hashMetrics;
         try
         {
-            hashMetrics = await GetOrComputeHashesAsync(fileInfo, traceId, cancellationToken).ConfigureAwait(false);
+            hashMetrics = await _videoHashResolverService
+                .ResolveAsync(fileInfo.FullName, cancellationToken, traceId)
+                .ConfigureAwait(false);
             hashResult = hashMetrics.HashResult;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -238,41 +229,6 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
             IsHearingImpaired = snapshot.IsHearingImpaired,
             Stream = new MemoryStream(downloadedSubtitle.Content, writable: false)
         };
-    }
-
-    private async Task<HashResolutionMetrics> GetOrComputeHashesAsync(
-        FileInfo fileInfo,
-        string traceId,
-        CancellationToken cancellationToken)
-    {
-        var cacheLookupStopwatch = Stopwatch.StartNew();
-        var cached = await _videoHashCacheService.TryGetAsync(fileInfo.FullName, cancellationToken).ConfigureAwait(false);
-        cacheLookupStopwatch.Stop();
-        if (cached is not null)
-        {
-            return new HashResolutionMetrics(
-                cached,
-                CacheHit: true,
-                CacheLookupMs: cacheLookupStopwatch.Elapsed.TotalMilliseconds,
-                ComputeMs: 0,
-                CacheSaveMs: 0);
-        }
-
-        var computeStopwatch = Stopwatch.StartNew();
-        var computed = await _videoHashCalculator
-            .ComputeAsync(fileInfo.FullName, cancellationToken, traceId)
-            .ConfigureAwait(false);
-        computeStopwatch.Stop();
-
-        var cacheSaveStopwatch = Stopwatch.StartNew();
-        await _videoHashCacheService.SaveAsync(computed, cancellationToken).ConfigureAwait(false);
-        cacheSaveStopwatch.Stop();
-        return new HashResolutionMetrics(
-            computed,
-            CacheHit: false,
-            CacheLookupMs: cacheLookupStopwatch.Elapsed.TotalMilliseconds,
-            ComputeMs: computeStopwatch.Elapsed.TotalMilliseconds,
-            CacheSaveMs: cacheSaveStopwatch.Elapsed.TotalMilliseconds);
     }
 
     private RemoteSubtitleInfo CreateRemoteSubtitleInfo(
