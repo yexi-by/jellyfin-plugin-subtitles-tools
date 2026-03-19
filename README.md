@@ -46,8 +46,59 @@ dotnet test
 4. 在插件配置页填入 Python 服务地址，例如 `http://127.0.0.1:8055`
 5. 如需减少首次搜字幕等待时间，可开启自动预计算，或到计划任务页手动执行一次“预计算缺失的视频哈希”
 
-## 发布文件
+## 开发流程
 
-- 当前最新插件压缩包位于 [release-assets/Jellyfin.Plugin.SubtitlesTools_0.1.2.0.zip](./release-assets/Jellyfin.Plugin.SubtitlesTools_0.1.2.0.zip)
-- GitHub Actions 已包含基于 tag 的 Release 上传工作流
-- manifest 指向 GitHub Releases 的固定下载地址
+### 只改代码，不发版
+
+这种情况只需要把它当普通源码仓库处理：
+
+1. 修改代码
+2. 运行 `dotnet test`
+3. 提交并推送 `main`
+
+这时候你不需要做下面这些事：
+
+- 不需要改 `manifest/stable.json`
+- 不需要生成 zip
+- 不需要打 tag
+- 不需要创建 GitHub Release
+
+## 发版流程
+
+正式发版时，仓库里不再保存 `release-assets` 目录中的 zip。发版包由 GitHub Actions 在 tag 推送后自动构建并上传到 GitHub Releases。
+
+发版步骤固定为：
+
+1. 先把插件版本号改到目标版本  
+   位置是 `Jellyfin.Plugin.SubtitlesTools/Jellyfin.Plugin.SubtitlesTools.csproj` 的 `<Version>`
+2. 运行 `dotnet test`
+3. 提交并推送 `main`
+4. 创建并推送同版本 tag，例如 `v0.1.3.0`
+
+示例：
+
+```bash
+git add .
+git commit -m "Release v0.1.3.0"
+git push origin main
+git tag v0.1.3.0
+git push origin v0.1.3.0
+```
+
+tag 推上去以后，GitHub Actions 会自动完成三件事：
+
+- 构建发布 zip
+- 创建 GitHub Release 并上传 zip
+- 计算 zip 的 MD5，并自动回写 `manifest/stable.json`
+
+所以发版时你不需要再把 zip 提交进仓库。
+
+## 本地打包
+
+如果你只是想在本地先验一下插件包能不能正常生成，可以运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-plugin-package.ps1
+```
+
+这个脚本只会在本地生成 `artifacts/` 目录下的 zip 和 MD5，用于自测，不需要提交进 Git。

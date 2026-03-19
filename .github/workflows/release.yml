@@ -12,31 +12,106 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: 检出代码
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: 安装 .NET 9
+      - name: Setup .NET 9
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
 
-      - name: 执行测试
+      - name: Run tests
         run: dotnet test jellyfin-plugin-subtitles-tools.sln
 
-      - name: 准备发布资产
-        id: asset
+      - name: Build release package
+        id: package
         shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          ASSET_PATH="release-assets/Jellyfin.Plugin.SubtitlesTools_${VERSION}.zip"
-          if [ ! -f "$ASSET_PATH" ]; then
-            echo "未找到发布资产: $ASSET_PATH" >&2
-            exit 1
-          fi
-          echo "asset_path=$ASSET_PATH" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
 
-      - name: 创建 GitHub Release
+          VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_DIR="artifacts/package"
+          ASSET_NAME="Jellyfin.Plugin.SubtitlesTools_${VERSION}.zip"
+          ASSET_PATH="artifacts/${ASSET_NAME}"
+          TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+          dotnet build Jellyfin.Plugin.SubtitlesTools/Jellyfin.Plugin.SubtitlesTools.csproj -c Release --no-restore
+
+          mkdir -p "$PACKAGE_DIR"
+          cp Jellyfin.Plugin.SubtitlesTools/bin/Release/net9.0/Jellyfin.Plugin.SubtitlesTools.dll "$PACKAGE_DIR/"
+          cp Jellyfin.Plugin.SubtitlesTools/bin/Release/net9.0/Jellyfin.Plugin.SubtitlesTools.pdb "$PACKAGE_DIR/"
+          cp Jellyfin.Plugin.SubtitlesTools/bin/Release/net9.0/Jellyfin.Plugin.SubtitlesTools.xml "$PACKAGE_DIR/"
+          cp Jellyfin.Plugin.SubtitlesTools/bin/Release/net9.0/Jellyfin.Plugin.SubtitlesTools.deps.json "$PACKAGE_DIR/"
+
+          rm -f "$ASSET_PATH"
+          (
+            cd "$PACKAGE_DIR"
+            zip -q "../${ASSET_NAME}" \
+              Jellyfin.Plugin.SubtitlesTools.deps.json \
+              Jellyfin.Plugin.SubtitlesTools.dll \
+              Jellyfin.Plugin.SubtitlesTools.pdb \
+              Jellyfin.Plugin.SubtitlesTools.xml
+          )
+
+          CHECKSUM="$(md5sum "$ASSET_PATH" | awk '{print toupper($1)}')"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "asset_path=$ASSET_PATH" >> "$GITHUB_OUTPUT"
+          echo "checksum=$CHECKSUM" >> "$GITHUB_OUTPUT"
+          echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.asset.outputs.asset_path }}
+          files: ${{ steps.package.outputs.asset_path }}
           generate_release_notes: true
+
+      - name: Update manifest
+        shell: bash
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+          TIMESTAMP: ${{ steps.package.outputs.timestamp }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main
+          git checkout -B main origin/main
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          manifest_path = Path("manifest/stable.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          version_info = manifest[0]["versions"][0]
+          version = os.environ["VERSION"]
+
+          version_info["version"] = version
+          version_info["sourceUrl"] = (
+              "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/"
+              f"releases/download/v{version}/Jellyfin.Plugin.SubtitlesTools_{version}.zip"
+          )
+          version_info["checksum"] = os.environ["CHECKSUM"]
+          version_info["timestamp"] = os.environ["TIMESTAMP"]
+
+          manifest_path.write_text(
+              json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          if git diff --quiet -- manifest/stable.json; then
+            echo "manifest unchanged"
+            exit 0
+          fi
+
+          git add manifest/stable.json
+          git commit -m "Update manifest for v${VERSION}"
+          git push origin main

@@ -26,7 +26,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             httpClient.DefaultRequestHeaders.UserAgent.Add(
                 new ProductInfoHeaderValue(
                     "Jellyfin-Plugin-SubtitlesTools",
-                    typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.1.2.0"));
+                    typeof(Plugin).Assembly.GetName().Version?.ToString() ?? "0.0.0.0"));
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
             return httpClient;
         });

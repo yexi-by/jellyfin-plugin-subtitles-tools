@@ -5,5 +5,5 @@ TestResults/
 .idea/
 *.user
 *.suo
-release-assets/publish/
-release-assets/publish-fixed/
+artifacts/
+release-assets/
