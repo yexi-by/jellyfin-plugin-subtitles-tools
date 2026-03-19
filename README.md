@@ -42,6 +42,6 @@ dotnet test
 
 ## 发布文件
 
-- 当前首版插件压缩包位于 [release-assets/Jellyfin.Plugin.SubtitlesTools_0.1.0.0.zip](./release-assets/Jellyfin.Plugin.SubtitlesTools_0.1.0.0.zip)
+- 当前最新插件压缩包位于 [release-assets/Jellyfin.Plugin.SubtitlesTools_0.1.1.0.zip](./release-assets/Jellyfin.Plugin.SubtitlesTools_0.1.1.0.zip)
 - GitHub Actions 已包含基于 tag 的 Release 上传工作流
 - manifest 指向 GitHub Releases 的固定下载地址

@@ -10,12 +10,12 @@
     "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
     "versions": [
       {
-        "version": "0.1.0.0",
-        "changelog": "首个公开版本，提供本地哈希计算、Python 服务联动、字幕搜索下载与配置页测试连接。",
+        "version": "0.1.1.0",
+        "changelog": "修复 Jellyfin 10.11.6 下的插件加载失败问题，清理错误依赖；修复配置页测试连接的结果展示，并刷新配置页前端资源缓存。",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.1.0.0/Jellyfin.Plugin.SubtitlesTools_0.1.0.0.zip",
-        "checksum": "01125C093605E6D5B8A62170EFC44565",
-        "timestamp": "2026-03-20T00:00:00Z"
+        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.1.1.0/Jellyfin.Plugin.SubtitlesTools_0.1.1.0.zip",
+        "checksum": "8EB65A99BE9CD6162C460C336EAC58DC",
+        "timestamp": "2026-03-19T19:13:22Z"
       }
     ]
   }

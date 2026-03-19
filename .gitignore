@@ -6,3 +6,4 @@ TestResults/
 *.user
 *.suo
 release-assets/publish/
+release-assets/publish-fixed/
