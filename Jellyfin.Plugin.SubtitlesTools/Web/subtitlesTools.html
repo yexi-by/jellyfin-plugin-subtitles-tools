@@ -1,0 +1,39 @@
+<div id="SubtitlesToolsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/subtitlesToolsjs">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="SubtitlesToolsConfigForm">
+                <div class="verticalSection">
+                    <h2 class="sectionTitle">Subtitles Tools</h2>
+                    <div class="fieldDescription">
+                        该插件仅支持 Jellyfin 10.11.6 及更新的 10.11 系列，并且当前只处理本地电影、剧集文件。
+                    </div>
+                    <div class="fieldDescription">
+                        Python 服务端项目：
+                        <a is="emby-linkbutton" class="button-link" target="_blank" href="https://github.com/yexi-by/subtitles-tools">https://github.com/yexi-by/subtitles-tools</a>
+                    </div>
+                </div>
+
+                <div class="inputContainer">
+                    <input is="emby-input" id="serviceBaseUrl" type="text" label="Python 服务地址" />
+                    <div class="fieldDescription">示例：<code>http://127.0.0.1:8055</code></div>
+                </div>
+
+                <div class="inputContainer">
+                    <input is="emby-input" id="requestTimeoutSeconds" type="number" min="1" max="120" label="请求超时（秒）" />
+                    <div class="fieldDescription">建议保持 10 秒，网络或磁盘较慢时可适当增大。</div>
+                </div>
+
+                <div class="fieldDescription" id="testConnectionMessage"></div>
+
+                <div class="formDialogFooter flex align-items-center">
+                    <button id="testConnectionButton" is="emby-button" type="button" class="raised button-cancel">
+                        <span>测试连接</span>
+                    </button>
+                    <button id="saveButton" is="emby-button" type="submit" class="raised button-submit">
+                        <span>${Save}</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

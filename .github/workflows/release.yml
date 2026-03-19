@@ -1,0 +1,42 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: 执行测试
+        run: dotnet test jellyfin-plugin-subtitles-tools.sln
+
+      - name: 准备发布资产
+        id: asset
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ASSET_PATH="release-assets/Jellyfin.Plugin.SubtitlesTools_${VERSION}.zip"
+          if [ ! -f "$ASSET_PATH" ]; then
+            echo "未找到发布资产: $ASSET_PATH" >&2
+            exit 1
+          fi
+          echo "asset_path=$ASSET_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.asset.outputs.asset_path }}
+          generate_release_notes: true
