@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -20,6 +21,13 @@ namespace Jellyfin.Plugin.SubtitlesTools;
 /// </summary>
 public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
 {
+    private readonly record struct HashResolutionMetrics(
+        VideoHashResult HashResult,
+        bool CacheHit,
+        double CacheLookupMs,
+        double ComputeMs,
+        double CacheSaveMs);
+
     private static readonly VideoContentType[] SupportedTypes =
     [
         VideoContentType.Episode,
@@ -101,6 +109,8 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var traceId = CreateTraceId();
+        var totalStopwatch = Stopwatch.StartNew();
 
         if (!SupportedTypes.Contains(request.ContentType))
         {
@@ -127,18 +137,27 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
         }
 
         VideoHashResult hashResult;
+        HashResolutionMetrics hashMetrics;
         try
         {
-            hashResult = await GetOrComputeHashesAsync(fileInfo, cancellationToken).ConfigureAwait(false);
+            hashMetrics = await GetOrComputeHashesAsync(fileInfo, traceId, cancellationToken).ConfigureAwait(false);
+            hashResult = hashMetrics.HashResult;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            _logger.LogWarning(ex, "计算视频哈希失败，无法继续搜索字幕。路径：{MediaPath}", request.MediaPath);
+            totalStopwatch.Stop();
+            _logger.LogWarning(
+                ex,
+                "trace={TraceId} client_search_hash_failed media_path={MediaPath} total_ms={ElapsedMs:F2}",
+                traceId,
+                request.MediaPath,
+                totalStopwatch.Elapsed.TotalMilliseconds);
             return Array.Empty<RemoteSubtitleInfo>();
         }
 
         try
         {
+            var serviceStopwatch = Stopwatch.StartNew();
             var response = await _apiClient.SearchAsync(
                 new SubtitleSearchRequestDto
                 {
@@ -146,16 +165,43 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
                     Cid = hashResult.Cid,
                     Name = fileInfo.Name
                 },
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                traceId).ConfigureAwait(false);
+            serviceStopwatch.Stop();
 
             var isHashMatch = string.Equals(response.MatchedBy, "gcid", StringComparison.OrdinalIgnoreCase);
-            return response.Items
+            var remoteItems = response.Items
                 .Select(item => CreateRemoteSubtitleInfo(item, request, isHashMatch))
                 .ToArray();
+            totalStopwatch.Stop();
+            _logger.LogInformation(
+                "trace={TraceId} client_search_complete media_path={MediaPath} hash_cache_hit={HashCacheHit} cache_lookup_ms={CacheLookupMs:F2} hash_compute_ms={HashComputeMs:F2} hash_save_ms={HashSaveMs:F2} service_ms={ServiceMs:F2} matched_by={MatchedBy} confidence={Confidence} items={ItemCount} total_ms={TotalMs:F2}",
+                traceId,
+                fileInfo.FullName,
+                hashMetrics.CacheHit,
+                hashMetrics.CacheLookupMs,
+                hashMetrics.ComputeMs,
+                hashMetrics.CacheSaveMs,
+                serviceStopwatch.Elapsed.TotalMilliseconds,
+                response.MatchedBy,
+                response.Confidence,
+                remoteItems.Length,
+                totalStopwatch.Elapsed.TotalMilliseconds);
+            return remoteItems;
         }
         catch (SubtitlesToolsApiException ex)
         {
-            _logger.LogWarning(ex, "调用 Python 服务搜索字幕失败。路径：{MediaPath}", request.MediaPath);
+            totalStopwatch.Stop();
+            _logger.LogWarning(
+                ex,
+                "trace={TraceId} client_search_service_failed media_path={MediaPath} hash_cache_hit={HashCacheHit} cache_lookup_ms={CacheLookupMs:F2} hash_compute_ms={HashComputeMs:F2} hash_save_ms={HashSaveMs:F2} total_ms={TotalMs:F2}",
+                traceId,
+                request.MediaPath,
+                hashMetrics.CacheHit,
+                hashMetrics.CacheLookupMs,
+                hashMetrics.ComputeMs,
+                hashMetrics.CacheSaveMs,
+                totalStopwatch.Elapsed.TotalMilliseconds);
             return Array.Empty<RemoteSubtitleInfo>();
         }
     }
@@ -168,10 +214,21 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
             throw new ArgumentException("字幕标识不能为空。", nameof(id));
         }
 
-        var downloadedSubtitle = await _apiClient.DownloadSubtitleAsync(id, cancellationToken).ConfigureAwait(false);
+        var traceId = CreateTraceId();
+        var totalStopwatch = Stopwatch.StartNew();
+        var downloadedSubtitle = await _apiClient.DownloadSubtitleAsync(id, cancellationToken, traceId).ConfigureAwait(false);
         var snapshot = _subtitleSnapshotCache.TryGetValue(id, out var cachedSnapshot)
             ? cachedSnapshot
             : CreateFallbackSnapshot(downloadedSubtitle.FileName);
+        totalStopwatch.Stop();
+        _logger.LogInformation(
+            "trace={TraceId} client_download_complete subtitle_id={SubtitleId} file_name={FileName} format={Format} bytes={ByteCount} total_ms={ElapsedMs:F2}",
+            traceId,
+            id,
+            downloadedSubtitle.FileName,
+            snapshot.Format,
+            downloadedSubtitle.Content.Length,
+            totalStopwatch.Elapsed.TotalMilliseconds);
 
         return new SubtitleResponse
         {
@@ -183,19 +240,39 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
         };
     }
 
-    private async Task<VideoHashResult> GetOrComputeHashesAsync(
+    private async Task<HashResolutionMetrics> GetOrComputeHashesAsync(
         FileInfo fileInfo,
+        string traceId,
         CancellationToken cancellationToken)
     {
+        var cacheLookupStopwatch = Stopwatch.StartNew();
         var cached = await _videoHashCacheService.TryGetAsync(fileInfo.FullName, cancellationToken).ConfigureAwait(false);
+        cacheLookupStopwatch.Stop();
         if (cached is not null)
         {
-            return cached;
+            return new HashResolutionMetrics(
+                cached,
+                CacheHit: true,
+                CacheLookupMs: cacheLookupStopwatch.Elapsed.TotalMilliseconds,
+                ComputeMs: 0,
+                CacheSaveMs: 0);
         }
 
-        var computed = await _videoHashCalculator.ComputeAsync(fileInfo.FullName, cancellationToken).ConfigureAwait(false);
+        var computeStopwatch = Stopwatch.StartNew();
+        var computed = await _videoHashCalculator
+            .ComputeAsync(fileInfo.FullName, cancellationToken, traceId)
+            .ConfigureAwait(false);
+        computeStopwatch.Stop();
+
+        var cacheSaveStopwatch = Stopwatch.StartNew();
         await _videoHashCacheService.SaveAsync(computed, cancellationToken).ConfigureAwait(false);
-        return computed;
+        cacheSaveStopwatch.Stop();
+        return new HashResolutionMetrics(
+            computed,
+            CacheHit: false,
+            CacheLookupMs: cacheLookupStopwatch.Elapsed.TotalMilliseconds,
+            ComputeMs: computeStopwatch.Elapsed.TotalMilliseconds,
+            CacheSaveMs: cacheSaveStopwatch.Elapsed.TotalMilliseconds);
     }
 
     private RemoteSubtitleInfo CreateRemoteSubtitleInfo(
@@ -337,5 +414,10 @@ public sealed class SubtitlesToolsSubtitleProvider : ISubtitleProvider
         {
             return null;
         }
+    }
+
+    private static string CreateTraceId()
+    {
+        return Guid.NewGuid().ToString("N")[..12];
     }
 }

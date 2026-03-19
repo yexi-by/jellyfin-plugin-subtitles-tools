@@ -1,9 +1,12 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.SubtitlesTools.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
@@ -17,14 +20,28 @@ public sealed class VideoHashCalculator
     private const int InitialPieceSize = 0x40000;
     private const int MaxPieceSize = 0x200000;
     private const int MaxPieceCount = 0x200;
+    private readonly ILogger<VideoHashCalculator> _logger;
+
+    /// <summary>
+    /// 初始化哈希计算器。
+    /// </summary>
+    /// <param name="logger">日志器。</param>
+    public VideoHashCalculator(ILogger<VideoHashCalculator>? logger = null)
+    {
+        _logger = logger ?? NullLogger<VideoHashCalculator>.Instance;
+    }
 
     /// <summary>
     /// 为给定视频文件计算 CID 和 GCID。
     /// </summary>
     /// <param name="mediaPath">视频文件完整路径。</param>
     /// <param name="cancellationToken">取消令牌。</param>
+    /// <param name="traceId">链路追踪标识。</param>
     /// <returns>包含 CID 与 GCID 的结果模型。</returns>
-    public async Task<VideoHashResult> ComputeAsync(string mediaPath, CancellationToken cancellationToken)
+    public async Task<VideoHashResult> ComputeAsync(
+        string mediaPath,
+        CancellationToken cancellationToken,
+        string? traceId = null)
     {
         if (string.IsNullOrWhiteSpace(mediaPath))
         {
@@ -37,8 +54,24 @@ public sealed class VideoHashCalculator
             throw new FileNotFoundException("媒体文件不存在。", mediaPath);
         }
 
+        var totalStopwatch = Stopwatch.StartNew();
+        var cidStopwatch = Stopwatch.StartNew();
         var cid = await ComputeCidAsync(fileInfo, cancellationToken).ConfigureAwait(false);
+        cidStopwatch.Stop();
+
+        var gcidStopwatch = Stopwatch.StartNew();
         var gcid = await ComputeGcidAsync(fileInfo, cancellationToken).ConfigureAwait(false);
+        gcidStopwatch.Stop();
+        totalStopwatch.Stop();
+
+        _logger.LogInformation(
+            "trace={TraceId} client_hash_complete path={MediaPath} file_size={FileSize} cid_ms={CidMs:F2} gcid_ms={GcidMs:F2} total_ms={TotalMs:F2}",
+            NormalizeTraceId(traceId),
+            fileInfo.FullName,
+            fileInfo.Length,
+            cidStopwatch.Elapsed.TotalMilliseconds,
+            gcidStopwatch.Elapsed.TotalMilliseconds,
+            totalStopwatch.Elapsed.TotalMilliseconds);
 
         return new VideoHashResult
         {
@@ -182,5 +215,10 @@ public sealed class VideoHashCalculator
     {
         hashAlgorithm.TransformFinalBlock([], 0, 0);
         return hashAlgorithm.Hash ?? [];
+    }
+
+    private static string NormalizeTraceId(string? traceId)
+    {
+        return string.IsNullOrWhiteSpace(traceId) ? "-" : traceId;
     }
 }
