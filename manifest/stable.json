@@ -14,8 +14,8 @@
         "changelog": "移除“记住字幕并自动切换”功能，改为纯字幕下载与管理模式；下载后的字幕会按“视频名.清洗后的原字幕名.扩展名”命名并允许多条并存，同时在分段字幕页面新增已保存字幕删除能力。",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.4.1.0/Jellyfin.Plugin.SubtitlesTools_0.4.1.0.zip",
-        "checksum": "",
-        "timestamp": ""
+        "checksum": "211245B253E33016F2BD5A90ADC2DC58",
+        "timestamp": "2026-03-20T19:01:05Z"
       }
     ]
   }
