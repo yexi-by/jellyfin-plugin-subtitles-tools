@@ -1,4 +1,13 @@
 <div id="SubtitlesToolsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/subtitlesToolsjsv2">
+    <style>
+        #SubtitlesToolsConfigForm {
+            padding-bottom: 9rem;
+        }
+
+        #SubtitlesToolsConfigPage .subtitlesToolsConfigFooter {
+            background: var(--theme-body-background, #101010);
+        }
+    </style>
     <div data-role="content">
         <div class="content-primary">
             <form id="SubtitlesToolsConfigForm">
@@ -61,7 +70,7 @@
                 </div>
 
                 <div class="inputContainer">
-                    <input is="emby-input" id="ffmpegExecutablePath" type="text" label="FFmpeg 可执行文件路径（可选）" />
+                    <input is="emby-input" id="ffmpegExecutablePath" type="text" label="FFmpeg 可执行文件路径（可选）" placeholder="/usr/lib/jellyfin-ffmpeg/ffmpeg" />
                     <div class="fieldDescription">
                         留空时会优先自动探测 Jellyfin 自带 FFmpeg，再回退到系统 PATH。
                     </div>
@@ -69,7 +78,7 @@
 
                 <div class="fieldDescription" id="testConnectionMessage"></div>
 
-                <div class="formDialogFooter flex align-items-center">
+                <div class="formDialogFooter flex align-items-center subtitlesToolsConfigFooter">
                     <button id="testConnectionButton" is="emby-button" type="button" class="raised button-cancel">
                         <span>测试连接</span>
                     </button>
