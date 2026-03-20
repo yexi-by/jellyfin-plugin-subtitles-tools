@@ -14,8 +14,8 @@
         "changelog": "插件改造成“自动转 MKV + 内封 SRT”方案：新视频可自动归档原始 CID/GCID 并自动转为 MKV，字幕下载后统一转成临时 UTF-8 SRT 再软封装进视频，详情页新增当前分段/整组转换入口与内封字幕流删除能力，同时彻底取消外挂字幕模式。",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.5.0.0/Jellyfin.Plugin.SubtitlesTools_0.5.0.0.zip",
-        "checksum": "44B070AF76DFE5379E7DAACEEB382A3F",
-        "timestamp": "2026-03-21T00:00:00Z"
+        "checksum": "5B32BF35605B0876BBE817E9749734A8",
+        "timestamp": "2026-03-20T21:16:36Z"
       }
     ]
   }
