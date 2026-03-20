@@ -3,7 +3,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.SubtitlesTools</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.SubtitlesTools</AssemblyName>
-    <Version>0.1.2.0</Version>
+    <Version>0.2.0.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Nullable>enable</Nullable>
@@ -23,5 +23,6 @@
   <ItemGroup>
     <EmbeddedResource Include="Web\subtitlesTools.html" />
     <EmbeddedResource Include="Web\subtitlesTools.js" />
+    <EmbeddedResource Include="Web\subtitlesToolsGlobal.js" />
   </ItemGroup>
 </Project>

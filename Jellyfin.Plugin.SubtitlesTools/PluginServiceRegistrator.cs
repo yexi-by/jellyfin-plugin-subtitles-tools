@@ -3,13 +3,12 @@ using System.Net.Http.Headers;
 using Jellyfin.Plugin.SubtitlesTools.Services;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
-using MediaBrowser.Controller.Subtitles;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Jellyfin.Plugin.SubtitlesTools;
 
 /// <summary>
-/// 注册插件所需的服务和字幕提供器。
+/// 注册插件所需的服务、后台任务和前端注入能力。
 /// </summary>
 public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
 {
@@ -30,14 +29,20 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
             return httpClient;
         });
+
         serviceCollection.AddSingleton<VideoHashCalculator>();
         serviceCollection.AddSingleton<VideoHashCacheService>();
         serviceCollection.AddSingleton<VideoHashResolverService>();
         serviceCollection.AddSingleton<VideoHashBackfillService>();
         serviceCollection.AddSingleton<SubtitlesToolsApiClient>();
+        serviceCollection.AddSingleton<SubtitleMetadataService>();
+        serviceCollection.AddSingleton<SidecarSubtitleService>();
+        serviceCollection.AddSingleton<MultipartMediaParserService>();
+        serviceCollection.AddSingleton<MultipartSubtitleManagerService>();
         serviceCollection.AddSingleton<PrecomputeMissingHashesScheduledTask>();
         serviceCollection.AddSingleton<VideoHashPrecomputeService>();
+
+        serviceCollection.AddHostedService<WebUiInjectionService>();
         serviceCollection.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<VideoHashPrecomputeService>());
-        serviceCollection.AddSingleton<ISubtitleProvider, SubtitlesToolsSubtitleProvider>();
     }
 }

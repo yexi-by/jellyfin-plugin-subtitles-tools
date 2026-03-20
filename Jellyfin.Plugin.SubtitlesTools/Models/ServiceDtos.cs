@@ -172,29 +172,6 @@ public sealed class DownloadedSubtitle
 /// <summary>
 /// 字幕快照，用于在下载阶段恢复 Jellyfin 需要的元数据。
 /// </summary>
-public sealed class SubtitleSnapshot
-{
-    /// <summary>
-    /// 获取或设置三位语言码。
-    /// </summary>
-    public string ThreeLetterLanguage { get; set; } = "und";
-
-    /// <summary>
-    /// 获取或设置字幕格式。
-    /// </summary>
-    public string Format { get; set; } = "srt";
-
-    /// <summary>
-    /// 获取或设置是否强制字幕。
-    /// </summary>
-    public bool IsForced { get; set; }
-
-    /// <summary>
-    /// 获取或设置是否听障字幕。
-    /// </summary>
-    public bool IsHearingImpaired { get; set; }
-}
-
 /// <summary>
 /// 健康检查结果模型。
 /// </summary>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -42,6 +43,10 @@ public sealed class VideoHashResolverService
     /// <param name="cancellationToken">取消令牌。</param>
     /// <param name="traceId">可选链路追踪标识。</param>
     /// <returns>包含缓存命中情况和耗时的解析结果。</returns>
+    [SuppressMessage(
+        "Security",
+        "CA3003:Review code for file path injection vulnerabilities",
+        Justification = "仅处理 Jellyfin 已验证存在的本地媒体路径；方法入口会再次校验文件存在性，后续只在该固定路径上读取哈希。")]
     public async Task<VideoHashResolutionMetrics> ResolveAsync(
         string mediaPath,
         CancellationToken cancellationToken,

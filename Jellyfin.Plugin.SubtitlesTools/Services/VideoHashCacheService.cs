@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -51,6 +52,10 @@ public sealed class VideoHashCacheService
     /// <param name="mediaPath">媒体文件完整路径。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>命中时返回缓存值，否则返回 <see langword="null"/>。</returns>
+    [SuppressMessage(
+        "Security",
+        "CA3003:Review code for file path injection vulnerabilities",
+        Justification = "缓存键和读取目标都绑定到已存在的本地媒体文件；方法只在插件自己的缓存目录内读写 JSON 缓存文件。")]
     public async Task<VideoHashResult?> TryGetAsync(string mediaPath, CancellationToken cancellationToken)
     {
         var fileInfo = new FileInfo(mediaPath);

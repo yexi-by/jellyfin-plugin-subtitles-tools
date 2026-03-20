@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
@@ -38,6 +39,10 @@ public sealed class VideoHashCalculator
     /// <param name="cancellationToken">取消令牌。</param>
     /// <param name="traceId">链路追踪标识。</param>
     /// <returns>包含 CID 与 GCID 的结果模型。</returns>
+    [SuppressMessage(
+        "Security",
+        "CA3003:Review code for file path injection vulnerabilities",
+        Justification = "这里只对调用前已验证存在的本地媒体文件执行只读哈希计算，不会拼接或派生新的外部路径。")]
     public async Task<VideoHashResult> ComputeAsync(
         string mediaPath,
         CancellationToken cancellationToken,
