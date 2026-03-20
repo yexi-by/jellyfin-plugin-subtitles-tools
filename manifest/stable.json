@@ -2,18 +2,18 @@
   {
     "guid": "b812b763-a31d-4d19-bfcc-15b9eac432cb",
     "name": "Subtitles Tools",
-    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供自定义分段字幕管理、搜索与下载。",
-    "overview": "计算本地视频 CID/GCID，在详情页提供分段字幕管理入口，支持逐段搜索、逐段下载，以及多分段媒体一键最佳匹配下载。",
+    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供自定义分段字幕管理、搜索、下载与已记住字幕自动切换。",
+    "overview": "计算本地视频 CID/GCID，在详情页提供分段字幕管理入口，支持逐段搜索、逐段下载、一键全段最佳匹配，以及按用户记住字幕并在下次播放时自动尝试切换。",
     "owner": "yexi-by",
     "category": "Metadata",
     "repositoryUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools",
     "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
     "versions": [
       {
-        "version": "0.2.0.0",
-        "changelog": "新增插件自定义的分段字幕管理页面：不再依赖 Jellyfin 原生字幕搜索流程，支持单文件与 cd1/cd2/cd3、part1/part2 等多分段媒体的逐段搜索、逐段下载，以及一键全段最佳匹配下载。",
+        "version": "0.3.0.0",
+        "changelog": "新增“记住字幕并在下次播放自动切换”能力：分段字幕页面现在支持把某条已落盘 sidecar 字幕记住为当前用户在该分段上的优先字幕；后续播放时，插件会在短窗口内自动尝试切到这条字幕，同时保留逐段搜索、逐段下载和一键全段最佳匹配下载能力。",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.2.0.0/Jellyfin.Plugin.SubtitlesTools_0.2.0.0.zip",
+        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.3.0.0/Jellyfin.Plugin.SubtitlesTools_0.3.0.0.zip",
         "checksum": "A4B743F2C708F8904C824A78BFDAD710",
         "timestamp": "2026-03-20T15:42:05Z"
       }

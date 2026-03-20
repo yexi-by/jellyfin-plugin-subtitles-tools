@@ -47,12 +47,28 @@ public sealed class SidecarSubtitleService
         return EnumerateExistingSubtitleFiles(mediaFile)
             .Select(file => new ExistingSubtitleDto
             {
+                Id = file.Name,
                 FileName = file.Name,
                 Language = _subtitleMetadataService.ResolveExistingSubtitleLanguage(mediaBaseName, file.Name),
                 Format = _subtitleMetadataService.NormalizeFormat(file.Extension)
             })
             .OrderBy(item => item.FileName, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    /// <summary>
+    /// 按文件名查找某个媒体旁边已存在的 sidecar 字幕。
+    /// </summary>
+    /// <param name="mediaFile">目标媒体文件。</param>
+    /// <param name="subtitleFileName">字幕文件名。</param>
+    /// <returns>找到时返回字幕摘要，否则返回空。</returns>
+    public ExistingSubtitleDto? GetExistingSubtitle(FileInfo mediaFile, string subtitleFileName)
+    {
+        ArgumentNullException.ThrowIfNull(mediaFile);
+        ArgumentException.ThrowIfNullOrWhiteSpace(subtitleFileName);
+
+        return GetExistingSubtitles(mediaFile)
+            .FirstOrDefault(item => string.Equals(item.FileName, subtitleFileName, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

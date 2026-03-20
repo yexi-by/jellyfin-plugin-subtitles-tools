@@ -12,7 +12,8 @@ function readForm(page) {
         ServiceBaseUrl: page.querySelector('#serviceBaseUrl').value.trim(),
         RequestTimeoutSeconds: Number.parseInt(page.querySelector('#requestTimeoutSeconds').value, 10) || 10,
         EnableAutoHashPrecompute: page.querySelector('#enableAutoHashPrecompute').checked,
-        HashPrecomputeConcurrency: Number.parseInt(page.querySelector('#hashPrecomputeConcurrency').value, 10) || 1
+        HashPrecomputeConcurrency: Number.parseInt(page.querySelector('#hashPrecomputeConcurrency').value, 10) || 1,
+        EnableRememberedSubtitleAutoApply: page.querySelector('#enableRememberedSubtitleAutoApply').checked
     };
 }
 
@@ -44,6 +45,7 @@ export default function (view) {
             view.querySelector('#requestTimeoutSeconds').value = config.RequestTimeoutSeconds || 10;
             view.querySelector('#enableAutoHashPrecompute').checked = !!config.EnableAutoHashPrecompute;
             view.querySelector('#hashPrecomputeConcurrency').value = config.HashPrecomputeConcurrency || 1;
+            view.querySelector('#enableRememberedSubtitleAutoApply').checked = config.EnableRememberedSubtitleAutoApply !== false;
             setMessage(view.querySelector('#testConnectionMessage'), '', false);
             Dashboard.hideLoadingMsg();
         }).catch(() => {
@@ -102,6 +104,7 @@ export default function (view) {
             config.RequestTimeoutSeconds = formValue.RequestTimeoutSeconds;
             config.EnableAutoHashPrecompute = formValue.EnableAutoHashPrecompute;
             config.HashPrecomputeConcurrency = formValue.HashPrecomputeConcurrency;
+            config.EnableRememberedSubtitleAutoApply = formValue.EnableRememberedSubtitleAutoApply;
 
             return ApiClient.updatePluginConfiguration(SubtitlesToolsConfig.pluginUniqueId, config);
         }).then(result => {

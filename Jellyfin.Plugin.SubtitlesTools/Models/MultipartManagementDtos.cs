@@ -23,12 +23,12 @@ public sealed class ManagedItemPartsResponseDto
     public string ItemType { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置当前条目是否被识别为多分段媒体。
+    /// 获取或设置当前媒体项是否被识别为多分段媒体。
     /// </summary>
     public bool IsMultipart { get; set; }
 
     /// <summary>
-    /// 获取或设置当前媒体项默认应高亮的分段标识。
+    /// 获取或设置当前媒体项默认高亮的分段标识。
     /// </summary>
     public string CurrentPartId { get; set; } = string.Empty;
 
@@ -82,13 +82,59 @@ public sealed class ManagedMediaPartDto
     /// 获取或设置当前分段已存在的外部字幕文件。
     /// </summary>
     public List<ExistingSubtitleDto> ExistingSubtitles { get; set; } = [];
+
+    /// <summary>
+    /// 获取或设置当前用户在该分段上记住的字幕信息。
+    /// </summary>
+    public ManagedRememberedSubtitleDto RememberedSubtitle { get; set; } = new();
 }
 
 /// <summary>
-/// 表示已存在于媒体目录中的 sidecar 字幕文件。
+/// 表示存在于媒体目录中的 sidecar 字幕文件。
 /// </summary>
 public sealed class ExistingSubtitleDto
 {
+    /// <summary>
+    /// 获取或设置稳定标识。
+    /// </summary>
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置字幕文件名。
+    /// </summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置三字母语言码。
+    /// </summary>
+    public string Language { get; set; } = "und";
+
+    /// <summary>
+    /// 获取或设置字幕格式。
+    /// </summary>
+    public string Format { get; set; } = "srt";
+
+    /// <summary>
+    /// 获取或设置当前用户是否已将该字幕记住为默认选项。
+    /// </summary>
+    public bool IsRemembered { get; set; }
+}
+
+/// <summary>
+/// 表示当前用户在某个分段上记住的字幕摘要。
+/// </summary>
+public sealed class ManagedRememberedSubtitleDto
+{
+    /// <summary>
+    /// 获取或设置状态。可用值为 none、active、missing。
+    /// </summary>
+    public string Status { get; set; } = "none";
+
+    /// <summary>
+    /// 获取或设置稳定标识。
+    /// </summary>
+    public string SubtitleId { get; set; } = string.Empty;
+
     /// <summary>
     /// 获取或设置字幕文件名。
     /// </summary>
@@ -262,6 +308,89 @@ public sealed class ManagedPartDownloadResponseDto
     /// 获取或设置成功写入的字幕信息。
     /// </summary>
     public ManagedWrittenSubtitleDto? WrittenSubtitle { get; set; }
+}
+
+/// <summary>
+/// 表示设置“记住字幕”时的请求体。
+/// </summary>
+public sealed class ManagedRememberedSubtitleRequestDto
+{
+    /// <summary>
+    /// 获取或设置目标 sidecar 字幕文件名。
+    /// </summary>
+    public string SubtitleFileName { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 表示设置或清除“记住字幕”后的结果。
+/// </summary>
+public sealed class ManagedRememberedSubtitleResponseDto
+{
+    /// <summary>
+    /// 获取或设置结果状态。
+    /// </summary>
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置结果消息。
+    /// </summary>
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置当前分段更新后的记住字幕摘要。
+    /// </summary>
+    public ManagedRememberedSubtitleDto RememberedSubtitle { get; set; } = new();
+}
+
+/// <summary>
+/// 表示播放时自动应用已记住字幕的查询结果。
+/// </summary>
+public sealed class RememberedSubtitleAutoApplyResponseDto
+{
+    /// <summary>
+    /// 获取或设置结果状态。
+    /// </summary>
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置结果消息。
+    /// </summary>
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置当前播放键，用于前端避免同一次播放重复自动切换。
+    /// </summary>
+    public string PlaybackKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置当前会话标识。
+    /// </summary>
+    public string SessionId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置当前播放的媒体项标识。
+    /// </summary>
+    public string ItemId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置当前分段标识。
+    /// </summary>
+    public string PartId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置已记住的字幕文件名。
+    /// </summary>
+    public string SubtitleFileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置目标字幕流索引。
+    /// </summary>
+    public int? TargetSubtitleStreamIndex { get; set; }
+
+    /// <summary>
+    /// 获取或设置当前会话已选择的字幕流索引。
+    /// </summary>
+    public int? CurrentSubtitleStreamIndex { get; set; }
 }
 
 /// <summary>

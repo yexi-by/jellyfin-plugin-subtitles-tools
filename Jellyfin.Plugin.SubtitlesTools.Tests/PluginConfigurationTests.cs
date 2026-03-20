@@ -69,5 +69,6 @@ public sealed class PluginConfigurationTests
 
         Assert.False(configuration.EnableAutoHashPrecompute);
         Assert.Equal(1, configuration.HashPrecomputeConcurrency);
+        Assert.True(configuration.EnableRememberedSubtitleAutoApply);
     }
 }
