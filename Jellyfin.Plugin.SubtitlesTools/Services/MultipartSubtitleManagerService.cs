@@ -18,7 +18,8 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 负责“分段字幕管理页”所需的媒体识别、搜索、下载、记住字幕和元数据刷新流程。
+/// 负责“分段字幕管理页”所需的媒体识别、搜索、下载、删除和元数据刷新流程。
+/// 当前版本只负责把字幕写入媒体目录，并把具体启用哪条字幕交给 Jellyfin 播放器。
 /// </summary>
 public sealed class MultipartSubtitleManagerService
 {
@@ -30,7 +31,6 @@ public sealed class MultipartSubtitleManagerService
     private readonly MultipartMediaParserService _multipartMediaParserService;
     private readonly SidecarSubtitleService _sidecarSubtitleService;
     private readonly SubtitleMetadataService _subtitleMetadataService;
-    private readonly RememberedSubtitleStoreService _rememberedSubtitleStoreService;
     private readonly ILogger<MultipartSubtitleManagerService> _logger;
 
     /// <summary>
@@ -45,7 +45,6 @@ public sealed class MultipartSubtitleManagerService
         MultipartMediaParserService multipartMediaParserService,
         SidecarSubtitleService sidecarSubtitleService,
         SubtitleMetadataService subtitleMetadataService,
-        RememberedSubtitleStoreService rememberedSubtitleStoreService,
         ILogger<MultipartSubtitleManagerService> logger)
     {
         _libraryManager = libraryManager;
@@ -56,24 +55,19 @@ public sealed class MultipartSubtitleManagerService
         _multipartMediaParserService = multipartMediaParserService;
         _sidecarSubtitleService = sidecarSubtitleService;
         _subtitleMetadataService = subtitleMetadataService;
-        _rememberedSubtitleStoreService = rememberedSubtitleStoreService;
         _logger = logger;
     }
 
     /// <summary>
-    /// 获取媒体项的分段结构、现有字幕状态以及当前用户的记住字幕信息。
+    /// 获取媒体项的分段结构与现有字幕状态。
     /// </summary>
     /// <param name="itemId">Jellyfin 媒体项标识。</param>
-    /// <param name="userId">当前登录用户标识。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>分段首页响应。</returns>
-    public async Task<ManagedItemPartsResponseDto> GetItemPartsAsync(
-        Guid itemId,
-        Guid userId,
-        CancellationToken cancellationToken)
+    public Task<ManagedItemPartsResponseDto> GetItemPartsAsync(Guid itemId, CancellationToken cancellationToken)
     {
         var context = ResolveContext(itemId, cancellationToken);
-        return await BuildItemPartsResponseAsync(context, userId, cancellationToken).ConfigureAwait(false);
+        return Task.FromResult(BuildItemPartsResponse(context));
     }
 
     /// <summary>
@@ -139,6 +133,7 @@ public sealed class MultipartSubtitleManagerService
 
     /// <summary>
     /// 将指定候选字幕下载并写入某个分段旁边。
+    /// 新规则不会覆盖旧字幕，而是保留所有历史下载结果。
     /// </summary>
     /// <param name="itemId">Jellyfin 媒体项标识。</param>
     /// <param name="partId">分段标识。</param>
@@ -165,18 +160,6 @@ public sealed class MultipartSubtitleManagerService
 
         var context = ResolveContext(itemId, cancellationToken);
         var part = GetPart(context, partId);
-        var language = ResolveRequestLanguage(request);
-        var conflicts = _sidecarSubtitleService.FindConflictingSubtitleFiles(part.MediaFile, language);
-        if (conflicts.Count > 0 && !request.OverwriteExisting)
-        {
-            return new ManagedPartDownloadResponseDto
-            {
-                Status = "confirmation_required",
-                Message = "当前分段已存在同语言字幕，确认后将覆盖或替换旧字幕。",
-                Conflict = BuildConflict(part, language, request.Ext, conflicts)
-            };
-        }
-
         var traceId = CreateTraceId();
         var downloadedSubtitle = await _subtitlesToolsApiClient
             .DownloadSubtitleAsync(request.SubtitleId, cancellationToken, traceId)
@@ -184,10 +167,9 @@ public sealed class MultipartSubtitleManagerService
         var targetFile = await _sidecarSubtitleService
             .WriteSubtitleAsync(
                 part.MediaFile,
-                language,
+                request.Name,
                 request.Ext,
                 downloadedSubtitle.Content,
-                conflicts,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -208,10 +190,56 @@ public sealed class MultipartSubtitleManagerService
             WrittenSubtitle = new ManagedWrittenSubtitleDto
             {
                 FileName = targetFile.Name,
-                Language = language,
+                Language = ResolveRequestLanguage(request),
                 Format = _subtitleMetadataService.NormalizeFormat(request.Ext)
             }
         };
+    }
+
+    /// <summary>
+    /// 删除某个分段旁边的一条已保存字幕。
+    /// </summary>
+    /// <param name="itemId">Jellyfin 媒体项标识。</param>
+    /// <param name="partId">分段标识。</param>
+    /// <param name="request">删除请求体。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>删除结果。</returns>
+    public Task<ManagedDeleteSubtitleResponseDto> DeleteSubtitleAsync(
+        Guid itemId,
+        string partId,
+        ManagedDeleteSubtitleRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (string.IsNullOrWhiteSpace(partId))
+        {
+            throw new ArgumentException("分段标识不能为空。", nameof(partId));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.SubtitleFileName))
+        {
+            throw new ArgumentException("字幕文件名不能为空。", nameof(request));
+        }
+
+        var context = ResolveContext(itemId, cancellationToken);
+        var part = GetPart(context, partId);
+        var deletedFile = _sidecarSubtitleService.DeleteSubtitle(part.MediaFile, request.SubtitleFileName);
+        QueueItemRefresh(context.Item);
+
+        _logger.LogInformation(
+            "multipart_delete_subtitle_complete item_id={ItemId} part_id={PartId} subtitle_file={SubtitleFile}",
+            itemId,
+            part.Id,
+            deletedFile.Name);
+
+        return Task.FromResult(
+            new ManagedDeleteSubtitleResponseDto
+            {
+                Status = "deleted",
+                Message = "字幕已从媒体目录删除。",
+                DeletedSubtitleFileName = deletedFile.Name
+            });
     }
 
     /// <summary>
@@ -230,108 +258,64 @@ public sealed class MultipartSubtitleManagerService
 
         var context = ResolveContext(itemId, cancellationToken);
         var previewResults = new List<ManagedBatchPartResultDto>();
-        var conflicts = new List<ManagedDownloadConflictDto>();
-        var pendingDownloads = new List<PendingBestDownload>();
         var traceId = CreateTraceId();
 
         foreach (var part in context.Group.Parts)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var hashMetrics = await _videoHashResolverService
-                .ResolveAsync(part.MediaFile.FullName, cancellationToken, traceId)
-                .ConfigureAwait(false);
-            var searchResponse = await _subtitlesToolsApiClient.SearchAsync(
-                    new SubtitleSearchRequestDto
-                    {
-                        Gcid = hashMetrics.HashResult.Gcid,
-                        Cid = hashMetrics.HashResult.Cid,
-                        Name = part.MediaFile.Name
-                    },
-                    cancellationToken,
-                    traceId)
-                .ConfigureAwait(false);
-
-            var bestCandidate = searchResponse.Items.FirstOrDefault();
-            if (bestCandidate is null)
-            {
-                previewResults.Add(new ManagedBatchPartResultDto
-                {
-                    PartId = part.Id,
-                    Label = part.Label,
-                    Status = "no_candidates",
-                    Message = "未找到可下载的字幕候选。"
-                });
-                continue;
-            }
-
-            var language = _subtitleMetadataService.ResolveThreeLetterLanguage(bestCandidate.Languages);
-            var conflictingFiles = _sidecarSubtitleService.FindConflictingSubtitleFiles(part.MediaFile, language);
-            if (conflictingFiles.Count > 0 && !request.OverwriteExisting)
-            {
-                var conflict = BuildConflict(part, language, bestCandidate.Ext, conflictingFiles);
-                conflicts.Add(conflict);
-                previewResults.Add(new ManagedBatchPartResultDto
-                {
-                    PartId = part.Id,
-                    Label = part.Label,
-                    Status = "confirmation_required",
-                    Message = "存在同语言字幕冲突，等待确认。",
-                    Conflict = conflict
-                });
-                continue;
-            }
-
-            pendingDownloads.Add(new PendingBestDownload
-            {
-                Part = part,
-                Candidate = bestCandidate,
-                Language = language,
-                ConflictingFiles = conflictingFiles
-            });
-        }
-
-        if (conflicts.Count > 0 && !request.OverwriteExisting)
-        {
-            return new ManagedDownloadBestResponseDto
-            {
-                Status = "confirmation_required",
-                Message = "部分分段已存在同语言字幕，确认后将统一覆盖或替换。",
-                Items = previewResults,
-                Conflicts = conflicts
-            };
-        }
-
-        foreach (var pendingDownload in pendingDownloads)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
             try
             {
+                var hashMetrics = await _videoHashResolverService
+                    .ResolveAsync(part.MediaFile.FullName, cancellationToken, traceId)
+                    .ConfigureAwait(false);
+                var searchResponse = await _subtitlesToolsApiClient.SearchAsync(
+                        new SubtitleSearchRequestDto
+                        {
+                            Gcid = hashMetrics.HashResult.Gcid,
+                            Cid = hashMetrics.HashResult.Cid,
+                            Name = part.MediaFile.Name
+                        },
+                        cancellationToken,
+                        traceId)
+                    .ConfigureAwait(false);
+
+                var bestCandidate = searchResponse.Items.FirstOrDefault();
+                if (bestCandidate is null)
+                {
+                    previewResults.Add(new ManagedBatchPartResultDto
+                    {
+                        PartId = part.Id,
+                        Label = part.Label,
+                        Status = "no_candidates",
+                        Message = "未找到可下载的字幕候选。"
+                    });
+                    continue;
+                }
+
                 var downloadedSubtitle = await _subtitlesToolsApiClient
-                    .DownloadSubtitleAsync(pendingDownload.Candidate.Id, cancellationToken, traceId)
+                    .DownloadSubtitleAsync(bestCandidate.Id, cancellationToken, traceId)
                     .ConfigureAwait(false);
                 var targetFile = await _sidecarSubtitleService
                     .WriteSubtitleAsync(
-                        pendingDownload.Part.MediaFile,
-                        pendingDownload.Language,
-                        pendingDownload.Candidate.Ext,
+                        part.MediaFile,
+                        bestCandidate.Name,
+                        bestCandidate.Ext,
                         downloadedSubtitle.Content,
-                        pendingDownload.ConflictingFiles,
                         cancellationToken)
                     .ConfigureAwait(false);
 
                 previewResults.Add(new ManagedBatchPartResultDto
                 {
-                    PartId = pendingDownload.Part.Id,
-                    Label = pendingDownload.Part.Label,
+                    PartId = part.Id,
+                    Label = part.Label,
                     Status = "downloaded",
                     Message = "字幕已写入媒体目录。",
                     WrittenSubtitle = new ManagedWrittenSubtitleDto
                     {
                         FileName = targetFile.Name,
-                        Language = pendingDownload.Language,
-                        Format = _subtitleMetadataService.NormalizeFormat(pendingDownload.Candidate.Ext)
+                        Language = _subtitleMetadataService.ResolveThreeLetterLanguage(bestCandidate.Languages),
+                        Format = _subtitleMetadataService.NormalizeFormat(bestCandidate.Ext)
                     }
                 });
             }
@@ -342,11 +326,11 @@ public sealed class MultipartSubtitleManagerService
                     "trace={TraceId} multipart_download_best_part_failed item_id={ItemId} part_id={PartId}",
                     traceId,
                     itemId,
-                    pendingDownload.Part.Id);
+                    part.Id);
                 previewResults.Add(new ManagedBatchPartResultDto
                 {
-                    PartId = pendingDownload.Part.Id,
-                    Label = pendingDownload.Part.Label,
+                    PartId = part.Id,
+                    Label = part.Label,
                     Status = "failed",
                     Message = ex.Message
                 });
@@ -370,105 +354,8 @@ public sealed class MultipartSubtitleManagerService
         };
     }
 
-    /// <summary>
-    /// 将某条已落盘 sidecar 字幕记为当前用户在该分段上的默认字幕。
-    /// </summary>
-    /// <param name="itemId">Jellyfin 媒体项标识。</param>
-    /// <param name="partId">分段标识。</param>
-    /// <param name="userId">当前登录用户标识。</param>
-    /// <param name="request">记住字幕请求体。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>记住结果。</returns>
-    public async Task<ManagedRememberedSubtitleResponseDto> RememberSubtitleAsync(
-        Guid itemId,
-        string partId,
-        Guid userId,
-        ManagedRememberedSubtitleRequestDto request,
-        CancellationToken cancellationToken)
+    private ManagedItemPartsResponseDto BuildItemPartsResponse(ManagedItemContext context)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
-        if (string.IsNullOrWhiteSpace(partId))
-        {
-            throw new ArgumentException("分段标识不能为空。", nameof(partId));
-        }
-
-        if (string.IsNullOrWhiteSpace(request.SubtitleFileName))
-        {
-            throw new ArgumentException("字幕文件名不能为空。", nameof(request));
-        }
-
-        var context = ResolveContext(itemId, cancellationToken);
-        var part = GetPart(context, partId);
-        var existingSubtitle = _sidecarSubtitleService.GetExistingSubtitle(part.MediaFile, request.SubtitleFileName);
-        if (existingSubtitle is null)
-        {
-            throw new FileNotFoundException("目标字幕文件不属于当前分段，无法记住。");
-        }
-
-        var record = new RememberedSubtitleRecord
-        {
-            UserId = userId,
-            PartMediaPath = part.MediaFile.FullName,
-            ItemId = itemId.ToString("D"),
-            PartId = part.Id,
-            SubtitleFileName = existingSubtitle.FileName,
-            Language = existingSubtitle.Language,
-            Format = existingSubtitle.Format,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-
-        await _rememberedSubtitleStoreService.SetAsync(record, cancellationToken).ConfigureAwait(false);
-        return new ManagedRememberedSubtitleResponseDto
-        {
-            Status = "remembered",
-            Message = "已记住这条字幕，下次播放会优先自动切换。",
-            RememberedSubtitle = BuildRememberedSubtitle(existingSubtitle.FileName, existingSubtitle, record)
-        };
-    }
-
-    /// <summary>
-    /// 清除当前用户在某个分段上的记住字幕。
-    /// </summary>
-    /// <param name="itemId">Jellyfin 媒体项标识。</param>
-    /// <param name="partId">分段标识。</param>
-    /// <param name="userId">当前登录用户标识。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>清除结果。</returns>
-    public async Task<ManagedRememberedSubtitleResponseDto> ClearRememberedSubtitleAsync(
-        Guid itemId,
-        string partId,
-        Guid userId,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(partId))
-        {
-            throw new ArgumentException("分段标识不能为空。", nameof(partId));
-        }
-
-        var context = ResolveContext(itemId, cancellationToken);
-        var part = GetPart(context, partId);
-        var removed = await _rememberedSubtitleStoreService
-            .DeleteAsync(userId, part.MediaFile.FullName, cancellationToken)
-            .ConfigureAwait(false);
-
-        return new ManagedRememberedSubtitleResponseDto
-        {
-            Status = removed ? "cleared" : "noop",
-            Message = removed ? "已清除这条分段字幕的记忆。" : "当前分段没有已记住的字幕。",
-            RememberedSubtitle = new ManagedRememberedSubtitleDto()
-        };
-    }
-
-    private async Task<ManagedItemPartsResponseDto> BuildItemPartsResponseAsync(
-        ManagedItemContext context,
-        Guid userId,
-        CancellationToken cancellationToken)
-    {
-        var rememberedRecords = await _rememberedSubtitleStoreService
-            .GetManyAsync(userId, context.Group.Parts.Select(item => item.MediaFile.FullName), cancellationToken)
-            .ConfigureAwait(false);
-
         return new ManagedItemPartsResponseDto
         {
             ItemId = context.Item.Id.ToString("D"),
@@ -477,31 +364,13 @@ public sealed class MultipartSubtitleManagerService
             IsMultipart = context.Group.Parts.Count > 1,
             CurrentPartId = context.Group.CurrentPartId,
             Parts = context.Group.Parts
-                .Select(part => BuildManagedPart(part, context.Group.CurrentPartId, rememberedRecords))
+                .Select(part => BuildManagedPart(part, context.Group.CurrentPartId))
                 .ToList()
         };
     }
 
-    private ManagedMediaPartDto BuildManagedPart(
-        MultipartMediaPart part,
-        string currentPartId,
-        Dictionary<string, RememberedSubtitleRecord> rememberedRecords)
+    private ManagedMediaPartDto BuildManagedPart(MultipartMediaPart part, string currentPartId)
     {
-        rememberedRecords.TryGetValue(Path.GetFullPath(part.MediaFile.FullName), out var rememberedRecord);
-        var existingSubtitles = _sidecarSubtitleService.GetExistingSubtitles(part.MediaFile);
-        foreach (var existingSubtitle in existingSubtitles)
-        {
-            existingSubtitle.IsRemembered = rememberedRecord is not null
-                && string.Equals(existingSubtitle.FileName, rememberedRecord.SubtitleFileName, StringComparison.OrdinalIgnoreCase);
-        }
-
-        var rememberedSubtitle = BuildRememberedSubtitle(
-            rememberedRecord?.SubtitleFileName,
-            rememberedRecord is null
-                ? null
-                : existingSubtitles.FirstOrDefault(item => string.Equals(item.FileName, rememberedRecord.SubtitleFileName, StringComparison.OrdinalIgnoreCase)),
-            rememberedRecord);
-
         return new ManagedMediaPartDto
         {
             Id = part.Id,
@@ -511,40 +380,7 @@ public sealed class MultipartSubtitleManagerService
             PartKind = part.PartKind,
             PartNumber = part.PartNumber,
             IsCurrent = string.Equals(part.Id, currentPartId, StringComparison.Ordinal),
-            ExistingSubtitles = existingSubtitles,
-            RememberedSubtitle = rememberedSubtitle
-        };
-    }
-
-    private ManagedRememberedSubtitleDto BuildRememberedSubtitle(
-        string? subtitleId,
-        ExistingSubtitleDto? existingSubtitle,
-        RememberedSubtitleRecord? rememberedRecord)
-    {
-        if (rememberedRecord is null)
-        {
-            return new ManagedRememberedSubtitleDto();
-        }
-
-        if (existingSubtitle is null)
-        {
-            return new ManagedRememberedSubtitleDto
-            {
-                Status = "missing",
-                SubtitleId = subtitleId ?? rememberedRecord.SubtitleFileName,
-                FileName = rememberedRecord.SubtitleFileName,
-                Language = rememberedRecord.Language,
-                Format = rememberedRecord.Format
-            };
-        }
-
-        return new ManagedRememberedSubtitleDto
-        {
-            Status = "active",
-            SubtitleId = existingSubtitle.Id,
-            FileName = existingSubtitle.FileName,
-            Language = existingSubtitle.Language,
-            Format = existingSubtitle.Format
+            ExistingSubtitles = _sidecarSubtitleService.GetExistingSubtitles(part.MediaFile)
         };
     }
 
@@ -565,30 +401,14 @@ public sealed class MultipartSubtitleManagerService
             Score = item.Score,
             FingerprintScore = item.FingerprintScore,
             ExtraName = item.ExtraName,
-            TargetFileName = _sidecarSubtitleService.BuildTargetSubtitleFile(part.MediaFile, language, item.Ext).Name
-        };
-    }
-
-    private ManagedDownloadConflictDto BuildConflict(
-        MultipartMediaPart part,
-        string language,
-        string format,
-        IReadOnlyList<FileInfo> conflictingFiles)
-    {
-        return new ManagedDownloadConflictDto
-        {
-            PartId = part.Id,
-            PartLabel = part.Label,
-            Language = language,
-            TargetFileName = _sidecarSubtitleService.BuildTargetSubtitleFile(part.MediaFile, language, format).Name,
-            ExistingFiles = conflictingFiles.Select(file => file.Name).ToList()
+            TargetFileName = _sidecarSubtitleService.BuildTargetSubtitleFile(part.MediaFile, item.Name, item.Ext).Name
         };
     }
 
     [SuppressMessage(
         "Security",
         "CA3003:Review code for file path injection vulnerabilities",
-        Justification = "媒体路径不直接来自外部输入，而是来自 Jellyfin 已入库项；这里仅允许 Movie/Episode、本地路径且文件必须存在。")]
+        Justification = "媒体路径不直接来自外部输入，而是来自 Jellyfin 已入库项；这里只允许 Movie/Episode、本地路径且文件必须存在。")]
     private ManagedItemContext ResolveContext(Guid itemId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -685,31 +505,5 @@ public sealed class MultipartSubtitleManagerService
         /// 获取或设置通过文件系统识别出的分段组。
         /// </summary>
         public MultipartMediaGroup Group { get; set; } = null!;
-    }
-
-    /// <summary>
-    /// 表示待执行的一键最佳匹配下载项。
-    /// </summary>
-    private sealed class PendingBestDownload
-    {
-        /// <summary>
-        /// 获取或设置目标分段。
-        /// </summary>
-        public MultipartMediaPart Part { get; set; } = null!;
-
-        /// <summary>
-        /// 获取或设置该分段选中的最佳候选。
-        /// </summary>
-        public SubtitleSearchItemDto Candidate { get; set; } = null!;
-
-        /// <summary>
-        /// 获取或设置写入时使用的语言码。
-        /// </summary>
-        public string Language { get; set; } = "und";
-
-        /// <summary>
-        /// 获取或设置同语言冲突字幕列表。
-        /// </summary>
-        public List<FileInfo> ConflictingFiles { get; set; } = [];
     }
 }

@@ -37,8 +37,6 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<SubtitlesToolsApiClient>();
         serviceCollection.AddSingleton<SubtitleMetadataService>();
         serviceCollection.AddSingleton<SidecarSubtitleService>();
-        serviceCollection.AddSingleton<RememberedSubtitleStoreService>();
-        serviceCollection.AddSingleton<RememberedSubtitleAutoApplyService>();
         serviceCollection.AddSingleton<MultipartMediaParserService>();
         serviceCollection.AddSingleton<MultipartSubtitleManagerService>();
         serviceCollection.AddSingleton<PrecomputeMissingHashesScheduledTask>();

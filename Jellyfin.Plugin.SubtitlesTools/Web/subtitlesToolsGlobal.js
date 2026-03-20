@@ -12,8 +12,6 @@
         overlayId: 'subtitlesToolsOverlay',
         styleId: 'subtitlesToolsGlobalStyle',
         routePollMs: 1200,
-        playbackPollMs: 1500,
-        autoApplyRetryWindowMs: 8000,
         apiRoot: 'Jellyfin.Plugin.SubtitlesTools'
     };
 
@@ -23,13 +21,8 @@
         activePartId: null,
         searchResults: new Map(),
         lastBatchItems: [],
-        lastDownloadedSubtitles: new Map(),
         busy: false,
-        lastLocation: '',
-        playbackKey: '',
-        autoApplyWindowStartedAt: 0,
-        autoApplyHandledPlaybackKey: '',
-        autoApplyBusy: false
+        lastLocation: ''
     };
 
     function injectStyles() {
@@ -151,17 +144,8 @@
                 background: rgba(255, 255, 255, 0.12);
             }
 
-            .subtitles-tools-button.is-warning {
-                background: #70463a;
-            }
-
-            .subtitles-tools-button.is-success {
-                background: #216b49;
-            }
-
-            .subtitles-tools-button.is-small {
-                padding: 8px 12px;
-                font-size: 13px;
+            .subtitles-tools-button.is-danger {
+                background: #7a2e38;
             }
 
             .subtitles-tools-button:disabled {
@@ -236,37 +220,12 @@
                 color: #95f3b0;
             }
 
-            .subtitles-tools-chip-list {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 8px;
-            }
-
-            .subtitles-tools-chip {
-                padding: 6px 10px;
-                border-radius: 999px;
-                background: rgba(255, 255, 255, 0.08);
-                font-size: 12px;
-                color: rgba(255, 255, 255, 0.86);
-            }
-
-            .subtitles-tools-chip.is-accent {
-                background: rgba(79, 166, 255, 0.22);
-                color: #d8ecff;
-            }
-
-            .subtitles-tools-chip.is-warning {
-                background: rgba(213, 136, 85, 0.22);
-                color: #ffd7bf;
-            }
-
             .subtitles-tools-note {
                 font-size: 13px;
                 color: rgba(245, 247, 250, 0.72);
                 line-height: 1.6;
             }
 
-            .subtitles-tools-remembered-card,
             .subtitles-tools-existing-card,
             .subtitles-tools-result-card,
             .subtitles-tools-summary-item {
@@ -275,7 +234,6 @@
                 background: rgba(255, 255, 255, 0.05);
             }
 
-            .subtitles-tools-remembered-card,
             .subtitles-tools-existing-card {
                 display: grid;
                 gap: 10px;
@@ -468,7 +426,6 @@
         if (!isSameItem) {
             state.searchResults = new Map();
             state.lastBatchItems = [];
-            state.lastDownloadedSubtitles = new Map();
         }
 
         return payload;
@@ -488,7 +445,6 @@
             state.activePartId = null;
             state.searchResults = new Map();
             state.lastBatchItems = [];
-            state.lastDownloadedSubtitles = new Map();
             hideButton();
             return;
         }
@@ -502,7 +458,6 @@
             state.activePartId = null;
             state.searchResults = new Map();
             state.lastBatchItems = [];
-            state.lastDownloadedSubtitles = new Map();
             hideButton();
         }
     }
@@ -533,70 +488,26 @@
         statusElement.textContent = message || '';
     }
 
-    function renderRememberedSection(part) {
-        if (!part) {
-            return '<div class="subtitles-tools-remembered-card">未找到当前分段。</div>';
-        }
-
-        const remembered = part.RememberedSubtitle || { Status: 'none' };
-        const lastDownloadedFileName = state.lastDownloadedSubtitles.get(part.Id);
-        const actions = [];
-        let chips = '';
-        let description = '当前分段还没有记住字幕。';
-
-        if (remembered.Status === 'active') {
-            chips = '<span class="subtitles-tools-chip is-accent">已记住</span>';
-            description = `当前会优先尝试自动切换到 ${escapeHtml(remembered.FileName)}。`;
-            actions.push('<button class="subtitles-tools-button is-secondary is-small" type="button" data-action="clear-remembered">取消记住</button>');
-        } else if (remembered.Status === 'missing') {
-            chips = '<span class="subtitles-tools-chip is-warning">记忆已失效</span>';
-            description = `已记住的字幕 ${escapeHtml(remembered.FileName)} 不再存在，需要重新选择。`;
-            actions.push('<button class="subtitles-tools-button is-warning is-small" type="button" data-action="clear-remembered">清除失效记忆</button>');
-        }
-
-        if (lastDownloadedFileName && lastDownloadedFileName !== remembered.FileName) {
-            actions.push('<button class="subtitles-tools-button is-success is-small" type="button" data-action="remember-last-downloaded">记住刚下载的字幕</button>');
-        }
-
-        const meta = remembered.Status === 'none'
-            ? '<div class="subtitles-tools-note">只有在你明确点击“记住这条字幕”后，插件才会在下次播放时尝试自动切换。</div>'
-            : `
-                <div class="subtitles-tools-existing-meta">
-                    <span>文件：${escapeHtml(remembered.FileName)}</span>
-                    <span>语言：${escapeHtml(remembered.Language || 'und')}</span>
-                    <span>格式：${escapeHtml(remembered.Format || 'srt')}</span>
-                </div>
-            `;
-
-        return `
-            <div class="subtitles-tools-remembered-card">
-                <div class="subtitles-tools-existing-header">当前字幕记忆 ${chips}</div>
-                <div class="subtitles-tools-note">${description}</div>
-                ${meta}
-                ${actions.length > 0 ? `<div class="subtitles-tools-actions">${actions.join('')}</div>` : ''}
-            </div>
-        `;
-    }
-
     function renderExistingSubtitles(part) {
         if (!part || !Array.isArray(part.ExistingSubtitles) || part.ExistingSubtitles.length === 0) {
-            return '<div class="subtitles-tools-remembered-card">当前没有已保存的外部字幕。</div>';
+            return '<div class="subtitles-tools-summary-item">当前没有已保存的外部字幕。</div>';
         }
 
         return part.ExistingSubtitles.map(item => `
             <div class="subtitles-tools-existing-card">
-                <div class="subtitles-tools-existing-header">
-                    ${escapeHtml(item.FileName)}
-                    ${item.IsRemembered ? '<span class="subtitles-tools-chip is-accent">已记住</span>' : ''}
-                </div>
+                <div class="subtitles-tools-existing-header">${escapeHtml(item.FileName)}</div>
                 <div class="subtitles-tools-existing-meta">
                     <span>语言：${escapeHtml(item.Language)}</span>
                     <span>格式：${escapeHtml(item.Format)}</span>
                 </div>
                 <div class="subtitles-tools-actions">
-                    ${item.IsRemembered
-                        ? '<button class="subtitles-tools-button is-secondary is-small" type="button" data-action="clear-remembered">取消记住</button>'
-                        : `<button class="subtitles-tools-button is-small" type="button" data-action="remember-existing" data-subtitle-file="${escapeHtml(item.FileName)}">记住这条</button>`}
+                    <button
+                        class="subtitles-tools-button is-danger"
+                        type="button"
+                        data-action="delete-existing"
+                        data-subtitle-file="${escapeHtml(item.FileName)}">
+                        删除这条
+                    </button>
                 </div>
             </div>
         `).join('');
@@ -617,13 +528,15 @@
                     <span>分数：${escapeHtml(item.Score)}</span>
                     <span>目标文件：${escapeHtml(item.TargetFileName)}</span>
                 </div>
-                <button
-                    class="subtitles-tools-button"
-                    type="button"
-                    data-action="download-candidate"
-                    data-subtitle-id="${escapeHtml(item.Id)}">
-                    下载到当前分段
-                </button>
+                <div class="subtitles-tools-actions">
+                    <button
+                        class="subtitles-tools-button"
+                        type="button"
+                        data-action="download-candidate"
+                        data-subtitle-id="${escapeHtml(item.Id)}">
+                        下载到当前分段
+                    </button>
+                </div>
             </div>
         `).join('');
     }
@@ -658,7 +571,6 @@
         const activePart = getActivePart();
         const searchResultsHtml = activePart ? renderResults(activePart.Id) : '<div class="subtitles-tools-summary-item">未找到当前分段。</div>';
         const existingSubtitlesHtml = activePart ? renderExistingSubtitles(activePart) : '';
-        const rememberedHtml = activePart ? renderRememberedSection(activePart) : '';
 
         overlay.innerHTML = `
             <div class="subtitles-tools-panel">
@@ -698,10 +610,9 @@
                             <div class="subtitles-tools-summary-item">
                                 ${activePart ? `${escapeHtml(activePart.Label)} · ${escapeHtml(activePart.FileName)}` : '未找到当前分段。'}
                             </div>
-                        </div>
-                        <div class="subtitles-tools-section">
-                            <h3>自动切换记忆</h3>
-                            ${rememberedHtml}
+                            <div class="subtitles-tools-note">
+                                这个页面只负责把字幕下载到媒体目录，并管理已保存字幕。具体播放时启用哪条字幕，交给 Jellyfin 播放器自己选择。
+                            </div>
                         </div>
                         <div class="subtitles-tools-section">
                             <h3>已保存字幕</h3>
@@ -767,31 +678,6 @@
         return candidates.find(item => item.Id === subtitleId) || null;
     }
 
-    function formatConflictMessage(conflict) {
-        const existingFiles = Array.isArray(conflict.ExistingFiles) ? conflict.ExistingFiles.join('\n') : '';
-        return [
-            `${conflict.PartLabel} 已存在 ${conflict.Language} 字幕。`,
-            `目标文件：${conflict.TargetFileName}`,
-            existingFiles ? `现有文件：\n${existingFiles}` : '',
-            '',
-            '确认后将覆盖或替换这些文件。'
-        ].filter(Boolean).join('\n');
-    }
-
-    async function downloadCandidate(activePart, candidate, overwriteExisting) {
-        return apiRequest(
-            `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/download`,
-            'POST',
-            {
-                SubtitleId: candidate.Id,
-                Name: candidate.Name,
-                Ext: candidate.Ext,
-                Languages: candidate.Languages,
-                Language: candidate.Language,
-                OverwriteExisting: overwriteExisting
-            });
-    }
-
     async function downloadSelectedCandidate(subtitleId) {
         const activePart = getActivePart();
         if (!activePart) {
@@ -804,95 +690,57 @@
         }
 
         setStatus(`正在下载 ${candidate.DisplayName}……`, '');
-        let payload = await downloadCandidate(activePart, candidate, false);
-        if (payload.Status === 'confirmation_required' && payload.Conflict) {
-            const confirmed = window.confirm(formatConflictMessage(payload.Conflict));
-            if (!confirmed) {
-                setStatus('已取消下载。', '');
-                return;
-            }
-
-            payload = await downloadCandidate(activePart, candidate, true);
-        }
+        const payload = await apiRequest(
+            `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/download`,
+            'POST',
+            {
+                SubtitleId: candidate.Id,
+                Name: candidate.Name,
+                Ext: candidate.Ext,
+                Languages: candidate.Languages,
+                Language: candidate.Language
+            });
 
         if (payload.Status !== 'downloaded') {
             throw new Error(payload.Message || '字幕下载失败。');
         }
 
-        state.lastDownloadedSubtitles.set(activePart.Id, payload.WrittenSubtitle.FileName);
         state.lastBatchItems = [];
         await refreshOverlayData();
         setStatus(`字幕已保存为 ${payload.WrittenSubtitle.FileName}。`, 'success');
     }
 
-    async function downloadBest(overwriteExisting) {
-        return apiRequest(
-            `${CONFIG.apiRoot}/Items/${state.itemId}/download-best`,
+    async function deleteExistingSubtitle(subtitleFileName) {
+        const activePart = getActivePart();
+        if (!activePart) {
+            throw new Error('当前未选中有效分段。');
+        }
+
+        const confirmed = window.confirm(`确认删除 ${subtitleFileName} 吗？此操作会直接删除媒体目录中的字幕文件。`);
+        if (!confirmed) {
+            setStatus('已取消删除。', '');
+            return;
+        }
+
+        setStatus(`正在删除 ${subtitleFileName}……`, '');
+        const payload = await apiRequest(
+            `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/delete-subtitle`,
             'POST',
-            { OverwriteExisting: overwriteExisting });
+            { SubtitleFileName: subtitleFileName });
+        await refreshOverlayData();
+        setStatus(payload.Message || `已删除 ${subtitleFileName}。`, 'success');
     }
 
     async function runDownloadBest() {
         setStatus('正在为所有分段选择最佳字幕……', '');
-        let payload = await downloadBest(false);
-        if (payload.Status === 'confirmation_required' && Array.isArray(payload.Conflicts) && payload.Conflicts.length > 0) {
-            const message = payload.Conflicts.map(formatConflictMessage).join('\n\n');
-            const confirmed = window.confirm(message);
-            if (!confirmed) {
-                setStatus('已取消一键下载。', '');
-                renderOverlay();
-                return;
-            }
-
-            payload = await downloadBest(true);
-        }
+        const payload = await apiRequest(
+            `${CONFIG.apiRoot}/Items/${state.itemId}/download-best`,
+            'POST',
+            {});
 
         state.lastBatchItems = Array.isArray(payload.Items) ? payload.Items : [];
         await refreshOverlayData();
         setStatus(payload.Message || '批量处理已完成。', payload.Status === 'completed' ? 'success' : '');
-    }
-
-    async function rememberExistingSubtitle(subtitleFileName) {
-        const activePart = getActivePart();
-        if (!activePart) {
-            throw new Error('当前未选中有效分段。');
-        }
-
-        setStatus(`正在记住 ${subtitleFileName}……`, '');
-        const payload = await apiRequest(
-            `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/remembered-subtitle`,
-            'POST',
-            { SubtitleFileName: subtitleFileName });
-        await refreshOverlayData();
-        setStatus(payload.Message || '已记住这条字幕。', 'success');
-    }
-
-    async function clearRememberedSubtitle() {
-        const activePart = getActivePart();
-        if (!activePart) {
-            throw new Error('当前未选中有效分段。');
-        }
-
-        setStatus(`正在清除 ${activePart.Label} 的字幕记忆……`, '');
-        const payload = await apiRequest(
-            `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/remembered-subtitle`,
-            'DELETE');
-        await refreshOverlayData();
-        setStatus(payload.Message || '已清除字幕记忆。', 'success');
-    }
-
-    async function rememberLastDownloadedSubtitle() {
-        const activePart = getActivePart();
-        if (!activePart) {
-            throw new Error('当前未选中有效分段。');
-        }
-
-        const subtitleFileName = state.lastDownloadedSubtitles.get(activePart.Id);
-        if (!subtitleFileName) {
-            throw new Error('当前分段没有可记住的最近下载字幕。');
-        }
-
-        await rememberExistingSubtitle(subtitleFileName);
     }
 
     async function handleOverlayAction(event) {
@@ -938,120 +786,14 @@
                 return;
             }
 
-            if (action === 'remember-existing') {
+            if (action === 'delete-existing') {
                 const subtitleFileName = event.currentTarget.getAttribute('data-subtitle-file');
-                await rememberExistingSubtitle(subtitleFileName);
-                return;
-            }
-
-            if (action === 'clear-remembered') {
-                await clearRememberedSubtitle();
-                return;
-            }
-
-            if (action === 'remember-last-downloaded') {
-                await rememberLastDownloadedSubtitle();
+                await deleteExistingSubtitle(subtitleFileName);
             }
         } catch (error) {
             setStatus(error.message || '请求失败。', 'error');
         } finally {
             state.busy = false;
-        }
-    }
-
-    function resetAutoApplyState() {
-        state.playbackKey = '';
-        state.autoApplyWindowStartedAt = 0;
-        state.autoApplyHandledPlaybackKey = '';
-    }
-
-    function observePlaybackKey(playbackKey) {
-        if (!playbackKey) {
-            resetAutoApplyState();
-            return;
-        }
-
-        if (state.playbackKey !== playbackKey) {
-            state.playbackKey = playbackKey;
-            state.autoApplyWindowStartedAt = Date.now();
-            state.autoApplyHandledPlaybackKey = '';
-        }
-    }
-
-    function shouldStopAutoApplyRetry(payload) {
-        const playbackKey = payload.PlaybackKey || '';
-        if (!playbackKey) {
-            return true;
-        }
-
-        if (payload.Status === 'already_selected') {
-            return true;
-        }
-
-        if (payload.Status === 'not_found_in_streams') {
-            return Date.now() - state.autoApplyWindowStartedAt > CONFIG.autoApplyRetryWindowMs;
-        }
-
-        return payload.Status !== 'ready';
-    }
-
-    async function applyRememberedSubtitle(payload) {
-        if (!payload || !payload.SessionId || payload.TargetSubtitleStreamIndex === null || payload.TargetSubtitleStreamIndex === undefined) {
-            return;
-        }
-
-        await apiRequest(
-            `Sessions/${payload.SessionId}/Command`,
-            'POST',
-            {
-                Name: 'SetSubtitleStreamIndex',
-                Arguments: {
-                    Index: String(payload.TargetSubtitleStreamIndex)
-                }
-            });
-    }
-
-    async function pollRememberedSubtitleAutoApply() {
-        if (state.autoApplyBusy) {
-            return;
-        }
-
-        if (!window.ApiClient || typeof window.ApiClient.ajax !== 'function' || typeof window.ApiClient.getUrl !== 'function') {
-            return;
-        }
-
-        state.autoApplyBusy = true;
-        try {
-            const payload = await apiRequest(`${CONFIG.apiRoot}/Playback/remembered-subtitle`, 'GET');
-            const playbackKey = payload.PlaybackKey || '';
-            observePlaybackKey(playbackKey);
-
-            if (!playbackKey) {
-                return;
-            }
-
-            if (state.autoApplyHandledPlaybackKey === playbackKey) {
-                return;
-            }
-
-            if (payload.Status === 'ready') {
-                if (Date.now() - state.autoApplyWindowStartedAt > CONFIG.autoApplyRetryWindowMs) {
-                    state.autoApplyHandledPlaybackKey = playbackKey;
-                    return;
-                }
-
-                await applyRememberedSubtitle(payload);
-                state.autoApplyHandledPlaybackKey = playbackKey;
-                return;
-            }
-
-            if (shouldStopAutoApplyRetry(payload)) {
-                state.autoApplyHandledPlaybackKey = playbackKey;
-            }
-        } catch (error) {
-            // 播放期自动切换属于尽力而为的能力，单次失败不应打断页面或播放器。
-        } finally {
-            state.autoApplyBusy = false;
         }
     }
 
@@ -1070,5 +812,4 @@
     window.addEventListener('hashchange', function () { scheduleRefresh(true); });
     window.addEventListener('popstate', function () { scheduleRefresh(true); });
     window.setInterval(function () { scheduleRefresh(false); }, CONFIG.routePollMs);
-    window.setInterval(function () { pollRememberedSubtitleAutoApply().catch(function () {}); }, CONFIG.playbackPollMs);
 })();

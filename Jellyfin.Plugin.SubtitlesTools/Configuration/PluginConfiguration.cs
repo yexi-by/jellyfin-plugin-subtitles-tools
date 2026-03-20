@@ -29,11 +29,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public const int DefaultHashPrecomputeConcurrency = 1;
 
     /// <summary>
-    /// 默认是否启用“记住字幕后在下次播放自动切换”的能力。
-    /// </summary>
-    public const bool DefaultEnableRememberedSubtitleAutoApply = true;
-
-    /// <summary>
     /// 初始化一个插件配置实例，并写入可直接运行的默认值。
     /// </summary>
     public PluginConfiguration()
@@ -42,7 +37,6 @@ public class PluginConfiguration : BasePluginConfiguration
         RequestTimeoutSeconds = DefaultRequestTimeoutSeconds;
         EnableAutoHashPrecompute = DefaultEnableAutoHashPrecompute;
         HashPrecomputeConcurrency = DefaultHashPrecomputeConcurrency;
-        EnableRememberedSubtitleAutoApply = DefaultEnableRememberedSubtitleAutoApply;
     }
 
     /// <summary>
@@ -64,11 +58,6 @@ public class PluginConfiguration : BasePluginConfiguration
     /// 获取或设置视频哈希预计算的最大并发数。
     /// </summary>
     public int HashPrecomputeConcurrency { get; set; }
-
-    /// <summary>
-    /// 获取或设置是否允许插件在用户下次播放时自动切换到已记住的字幕。
-    /// </summary>
-    public bool EnableRememberedSubtitleAutoApply { get; set; }
 
     /// <summary>
     /// 规范化 Python 服务基地址，确保协议合法且去掉多余尾斜杠。

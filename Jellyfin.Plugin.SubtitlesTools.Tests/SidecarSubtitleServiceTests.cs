@@ -3,27 +3,27 @@ using Jellyfin.Plugin.SubtitlesTools.Services;
 namespace Jellyfin.Plugin.SubtitlesTools.Tests;
 
 /// <summary>
-/// 校验 sidecar 字幕命名、冲突识别和覆盖写入逻辑。
+/// 校验 sidecar 字幕命名、并存写入和删除逻辑。
 /// </summary>
 public sealed class SidecarSubtitleServiceTests
 {
     private readonly SidecarSubtitleService _service = new(new SubtitleMetadataService());
 
     /// <summary>
-    /// 目标字幕文件名应沿用媒体文件名，并附加三字母语言码和规范化扩展名。
+    /// 目标字幕文件名应沿用媒体文件名前缀，并附加清洗后的原字幕标题。
     /// </summary>
     [Fact]
-    public void BuildTargetSubtitleFile_ShouldUsePartFileNameAndNormalizedSuffix()
+    public void BuildTargetSubtitleFile_ShouldUseMediaPrefixAndCleanedOriginalTitle()
     {
         var tempDirectoryPath = CreateTempDirectory();
 
         try
         {
-            var mediaFile = new FileInfo(CreateMediaFile(tempDirectoryPath, "movie-cd2.mkv"));
+            var mediaFile = new FileInfo(CreateMediaFile(tempDirectoryPath, "GHNU-31.mp4"));
 
-            var targetFile = _service.BuildTargetSubtitleFile(mediaFile, "zho", ".SRT");
+            var targetFile = _service.BuildTargetSubtitleFile(mediaFile, "网友上传:繁中?.srt", ".SRT");
 
-            Assert.Equal("movie-cd2.zho.srt", targetFile.Name, ignoreCase: true);
+            Assert.Equal("GHNU-31.网友上传 繁中.srt", targetFile.Name, ignoreCase: true);
             Assert.Equal(mediaFile.Directory!.FullName, targetFile.Directory!.FullName, ignoreCase: true);
         }
         finally
@@ -33,24 +33,21 @@ public sealed class SidecarSubtitleServiceTests
     }
 
     /// <summary>
-    /// 同语言的现有字幕文件应被识别为覆盖冲突，不同语言文件不应混入。
+    /// 若同名字幕已存在，应自动追加序号，避免覆盖旧字幕。
     /// </summary>
     [Fact]
-    public void FindConflictingSubtitleFiles_ShouldReturnOnlySameLanguageFiles()
+    public void BuildTargetSubtitleFile_ShouldAppendSequenceWhenSameNameAlreadyExists()
     {
         var tempDirectoryPath = CreateTempDirectory();
 
         try
         {
             var mediaFile = new FileInfo(CreateMediaFile(tempDirectoryPath, "movie-cd2.mkv"));
-            CreateSubtitleFile(tempDirectoryPath, "movie-cd2.zho.srt");
-            CreateSubtitleFile(tempDirectoryPath, "movie-cd2.zho.ass");
-            CreateSubtitleFile(tempDirectoryPath, "movie-cd2.eng.srt");
+            CreateSubtitleFile(tempDirectoryPath, "movie-cd2.网友上传.srt");
 
-            var conflicts = _service.FindConflictingSubtitleFiles(mediaFile, "zho");
+            var targetFile = _service.BuildTargetSubtitleFile(mediaFile, "网友上传.srt", "srt");
 
-            Assert.Equal(2, conflicts.Count);
-            Assert.All(conflicts, file => Assert.Contains(".zho.", file.Name, StringComparison.OrdinalIgnoreCase));
+            Assert.Equal("movie-cd2.网友上传.2.srt", targetFile.Name, ignoreCase: true);
         }
         finally
         {
@@ -59,31 +56,55 @@ public sealed class SidecarSubtitleServiceTests
     }
 
     /// <summary>
-    /// 写入新字幕时，应删除冲突的旧字幕并在目标路径生成新文件。
+    /// 写入新字幕时，应保留旧字幕，并在需要时为新字幕生成唯一文件名。
     /// </summary>
     [Fact]
-    public async Task WriteSubtitleAsync_ShouldReplaceConflictingFiles()
+    public async Task WriteSubtitleAsync_ShouldKeepExistingSubtitlesAndWriteUniqueFile()
     {
         var tempDirectoryPath = CreateTempDirectory();
 
         try
         {
             var mediaFile = new FileInfo(CreateMediaFile(tempDirectoryPath, "movie-cd2.mkv"));
-            var oldSubtitle = new FileInfo(CreateSubtitleFile(tempDirectoryPath, "movie-cd2.zho.ass"));
-            var conflicts = _service.FindConflictingSubtitleFiles(mediaFile, "zho");
+            var oldSubtitle = new FileInfo(CreateSubtitleFile(tempDirectoryPath, "movie-cd2.网友上传.srt"));
 
             var writtenFile = await _service.WriteSubtitleAsync(
                 mediaFile,
-                "zho",
+                "网友上传.srt",
                 "srt",
                 "1\n00:00:00,000 --> 00:00:01,000\nhello\n"u8.ToArray(),
-                conflicts,
                 CancellationToken.None);
 
-            Assert.Equal("movie-cd2.zho.srt", writtenFile.Name, ignoreCase: true);
+            Assert.Equal("movie-cd2.网友上传.2.srt", writtenFile.Name, ignoreCase: true);
             Assert.True(writtenFile.Exists);
-            Assert.False(oldSubtitle.Exists);
+            Assert.True(oldSubtitle.Exists);
             Assert.Equal("1\n00:00:00,000 --> 00:00:01,000\nhello\n", await File.ReadAllTextAsync(writtenFile.FullName));
+        }
+        finally
+        {
+            Directory.Delete(tempDirectoryPath, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// 删除已保存字幕时，应只删除指定文件，不影响同目录下的其他字幕。
+    /// </summary>
+    [Fact]
+    public void DeleteSubtitle_ShouldRemoveOnlyRequestedSidecarFile()
+    {
+        var tempDirectoryPath = CreateTempDirectory();
+
+        try
+        {
+            var mediaFile = new FileInfo(CreateMediaFile(tempDirectoryPath, "movie-cd2.mkv"));
+            var keptSubtitle = new FileInfo(CreateSubtitleFile(tempDirectoryPath, "movie-cd2.字幕A.srt"));
+            var deletedSubtitle = new FileInfo(CreateSubtitleFile(tempDirectoryPath, "movie-cd2.字幕B.srt"));
+
+            var deletedFile = _service.DeleteSubtitle(mediaFile, "movie-cd2.字幕B.srt");
+
+            Assert.Equal(deletedSubtitle.Name, deletedFile.Name, ignoreCase: true);
+            Assert.True(keptSubtitle.Exists);
+            Assert.False(deletedSubtitle.Exists);
         }
         finally
         {

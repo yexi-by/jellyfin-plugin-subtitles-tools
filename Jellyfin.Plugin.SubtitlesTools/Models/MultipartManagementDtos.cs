@@ -74,19 +74,14 @@ public sealed class ManagedMediaPartDto
     public int? PartNumber { get; set; }
 
     /// <summary>
-    /// 获取或设置该分段是否为当前 Jellyfin 条目主文件。
+    /// 获取或设置该分段是否为当前 Jellyfin 条目的主文件。
     /// </summary>
     public bool IsCurrent { get; set; }
 
     /// <summary>
-    /// 获取或设置当前分段已存在的外部字幕文件。
+    /// 获取或设置当前分段旁边已存在的外部字幕文件。
     /// </summary>
     public List<ExistingSubtitleDto> ExistingSubtitles { get; set; } = [];
-
-    /// <summary>
-    /// 获取或设置当前用户在该分段上记住的字幕信息。
-    /// </summary>
-    public ManagedRememberedSubtitleDto RememberedSubtitle { get; set; } = new();
 }
 
 /// <summary>
@@ -98,42 +93,6 @@ public sealed class ExistingSubtitleDto
     /// 获取或设置稳定标识。
     /// </summary>
     public string Id { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置字幕文件名。
-    /// </summary>
-    public string FileName { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置三字母语言码。
-    /// </summary>
-    public string Language { get; set; } = "und";
-
-    /// <summary>
-    /// 获取或设置字幕格式。
-    /// </summary>
-    public string Format { get; set; } = "srt";
-
-    /// <summary>
-    /// 获取或设置当前用户是否已将该字幕记住为默认选项。
-    /// </summary>
-    public bool IsRemembered { get; set; }
-}
-
-/// <summary>
-/// 表示当前用户在某个分段上记住的字幕摘要。
-/// </summary>
-public sealed class ManagedRememberedSubtitleDto
-{
-    /// <summary>
-    /// 获取或设置状态。可用值为 none、active、missing。
-    /// </summary>
-    public string Status { get; set; } = "none";
-
-    /// <summary>
-    /// 获取或设置稳定标识。
-    /// </summary>
-    public string SubtitleId { get; set; } = string.Empty;
 
     /// <summary>
     /// 获取或设置字幕文件名。
@@ -243,7 +202,7 @@ public sealed class ManagedSubtitleCandidateDto
     public string? ExtraName { get; set; }
 
     /// <summary>
-    /// 获取或设置将要写入的目标字幕文件名。
+    /// 获取或设置预计写入的目标字幕文件名。
     /// </summary>
     public string TargetFileName { get; set; } = string.Empty;
 }
@@ -277,11 +236,6 @@ public sealed class ManagedPartDownloadRequestDto
     /// 获取或设置已解析的三字母语言码。
     /// </summary>
     public string Language { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置是否允许覆盖同语言现有字幕。
-    /// </summary>
-    public bool OverwriteExisting { get; set; }
 }
 
 /// <summary>
@@ -300,31 +254,26 @@ public sealed class ManagedPartDownloadResponseDto
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置覆盖确认所需的冲突信息。
-    /// </summary>
-    public ManagedDownloadConflictDto? Conflict { get; set; }
-
-    /// <summary>
     /// 获取或设置成功写入的字幕信息。
     /// </summary>
     public ManagedWrittenSubtitleDto? WrittenSubtitle { get; set; }
 }
 
 /// <summary>
-/// 表示设置“记住字幕”时的请求体。
+/// 表示删除某条已保存字幕时的请求体。
 /// </summary>
-public sealed class ManagedRememberedSubtitleRequestDto
+public sealed class ManagedDeleteSubtitleRequestDto
 {
     /// <summary>
-    /// 获取或设置目标 sidecar 字幕文件名。
+    /// 获取或设置要删除的字幕文件名。
     /// </summary>
     public string SubtitleFileName { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// 表示设置或清除“记住字幕”后的结果。
+/// 表示删除某条已保存字幕后的结果。
 /// </summary>
-public sealed class ManagedRememberedSubtitleResponseDto
+public sealed class ManagedDeleteSubtitleResponseDto
 {
     /// <summary>
     /// 获取或设置结果状态。
@@ -337,60 +286,9 @@ public sealed class ManagedRememberedSubtitleResponseDto
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置当前分段更新后的记住字幕摘要。
+    /// 获取或设置被删除的字幕文件名。
     /// </summary>
-    public ManagedRememberedSubtitleDto RememberedSubtitle { get; set; } = new();
-}
-
-/// <summary>
-/// 表示播放时自动应用已记住字幕的查询结果。
-/// </summary>
-public sealed class RememberedSubtitleAutoApplyResponseDto
-{
-    /// <summary>
-    /// 获取或设置结果状态。
-    /// </summary>
-    public string Status { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置结果消息。
-    /// </summary>
-    public string Message { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置当前播放键，用于前端避免同一次播放重复自动切换。
-    /// </summary>
-    public string PlaybackKey { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置当前会话标识。
-    /// </summary>
-    public string SessionId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置当前播放的媒体项标识。
-    /// </summary>
-    public string ItemId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置当前分段标识。
-    /// </summary>
-    public string PartId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置已记住的字幕文件名。
-    /// </summary>
-    public string SubtitleFileName { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置目标字幕流索引。
-    /// </summary>
-    public int? TargetSubtitleStreamIndex { get; set; }
-
-    /// <summary>
-    /// 获取或设置当前会话已选择的字幕流索引。
-    /// </summary>
-    public int? CurrentSubtitleStreamIndex { get; set; }
+    public string DeletedSubtitleFileName { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -398,10 +296,6 @@ public sealed class RememberedSubtitleAutoApplyResponseDto
 /// </summary>
 public sealed class ManagedDownloadBestRequestDto
 {
-    /// <summary>
-    /// 获取或设置是否允许覆盖同语言现有字幕。
-    /// </summary>
-    public bool OverwriteExisting { get; set; }
 }
 
 /// <summary>
@@ -423,11 +317,6 @@ public sealed class ManagedDownloadBestResponseDto
     /// 获取或设置各分段的执行结果。
     /// </summary>
     public List<ManagedBatchPartResultDto> Items { get; set; } = [];
-
-    /// <summary>
-    /// 获取或设置需要用户确认的覆盖冲突集合。
-    /// </summary>
-    public List<ManagedDownloadConflictDto> Conflicts { get; set; } = [];
 }
 
 /// <summary>
@@ -459,42 +348,6 @@ public sealed class ManagedBatchPartResultDto
     /// 获取或设置成功写入的字幕信息。
     /// </summary>
     public ManagedWrittenSubtitleDto? WrittenSubtitle { get; set; }
-
-    /// <summary>
-    /// 获取或设置冲突信息。
-    /// </summary>
-    public ManagedDownloadConflictDto? Conflict { get; set; }
-}
-
-/// <summary>
-/// 表示同语言 sidecar 字幕覆盖前的冲突描述。
-/// </summary>
-public sealed class ManagedDownloadConflictDto
-{
-    /// <summary>
-    /// 获取或设置分段标识。
-    /// </summary>
-    public string PartId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置分段标签。
-    /// </summary>
-    public string PartLabel { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置冲突语言。
-    /// </summary>
-    public string Language { get; set; } = "und";
-
-    /// <summary>
-    /// 获取或设置计划写入的目标文件名。
-    /// </summary>
-    public string TargetFileName { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置当前已存在、将被覆盖或替换的字幕文件列表。
-    /// </summary>
-    public List<string> ExistingFiles { get; set; } = [];
 }
 
 /// <summary>
