@@ -10,7 +10,8 @@ public sealed class MultipartMediaParserServiceTests
     private readonly MultipartMediaParserService _parser = new();
 
     /// <summary>
-    /// 同目录下符合 cd1/cd2/cd3 命名的同扩展名文件应被识别为同一组分段。
+    /// 同目录下符合 cd1/cd2/cd3 命名的文件应被识别为同一组分段；
+    /// 即使其中某个分段已经提前转成 MKV，也不能因为扩展名不同而拆组。
     /// </summary>
     [Fact]
     public void Parse_ShouldGroupCdPartsInSameDirectory()
@@ -19,9 +20,9 @@ public sealed class MultipartMediaParserServiceTests
 
         try
         {
-            var cd1Path = CreateMediaFile(tempDirectoryPath, "movie-cd1.mp4");
+            var cd1Path = CreateMediaFile(tempDirectoryPath, "movie-cd1.mkv");
             var cd2Path = CreateMediaFile(tempDirectoryPath, "movie-cd2.mp4");
-            var cd3Path = CreateMediaFile(tempDirectoryPath, "movie-cd3.mp4");
+            var cd3Path = CreateMediaFile(tempDirectoryPath, "movie-cd3.avi");
             CreateMediaFile(tempDirectoryPath, "movie-trailer.mp4");
 
             var group = _parser.Parse(cd2Path);

@@ -12,7 +12,10 @@ function readForm(page) {
         ServiceBaseUrl: page.querySelector('#serviceBaseUrl').value.trim(),
         RequestTimeoutSeconds: Number.parseInt(page.querySelector('#requestTimeoutSeconds').value, 10) || 10,
         EnableAutoHashPrecompute: page.querySelector('#enableAutoHashPrecompute').checked,
-        HashPrecomputeConcurrency: Number.parseInt(page.querySelector('#hashPrecomputeConcurrency').value, 10) || 1
+        HashPrecomputeConcurrency: Number.parseInt(page.querySelector('#hashPrecomputeConcurrency').value, 10) || 1,
+        EnableAutoVideoConvertToMkv: page.querySelector('#enableAutoVideoConvertToMkv').checked,
+        VideoConvertConcurrency: Number.parseInt(page.querySelector('#videoConvertConcurrency').value, 10) || 1,
+        FfmpegExecutablePath: page.querySelector('#ffmpegExecutablePath').value.trim()
     };
 }
 
@@ -42,8 +45,11 @@ export default function (view) {
         ApiClient.getPluginConfiguration(SubtitlesToolsConfig.pluginUniqueId).then(config => {
             view.querySelector('#serviceBaseUrl').value = config.ServiceBaseUrl || 'http://127.0.0.1:8055';
             view.querySelector('#requestTimeoutSeconds').value = config.RequestTimeoutSeconds || 10;
-            view.querySelector('#enableAutoHashPrecompute').checked = !!config.EnableAutoHashPrecompute;
+            view.querySelector('#enableAutoHashPrecompute').checked = config.EnableAutoHashPrecompute !== false;
             view.querySelector('#hashPrecomputeConcurrency').value = config.HashPrecomputeConcurrency || 1;
+            view.querySelector('#enableAutoVideoConvertToMkv').checked = config.EnableAutoVideoConvertToMkv !== false;
+            view.querySelector('#videoConvertConcurrency').value = config.VideoConvertConcurrency || 1;
+            view.querySelector('#ffmpegExecutablePath').value = config.FfmpegExecutablePath || '';
             setMessage(view.querySelector('#testConnectionMessage'), '', false);
             Dashboard.hideLoadingMsg();
         }).catch(() => {
@@ -55,10 +61,7 @@ export default function (view) {
     view.querySelector('#testConnectionButton').addEventListener('click', function () {
         const messageElement = view.querySelector('#testConnectionMessage');
         const formValue = readForm(view);
-        const payload = JSON.stringify({
-            ServiceBaseUrl: formValue.ServiceBaseUrl,
-            RequestTimeoutSeconds: formValue.RequestTimeoutSeconds
-        });
+        const payload = JSON.stringify(formValue);
         const url = ApiClient.getUrl('Jellyfin.Plugin.SubtitlesTools/TestConnection');
 
         setButtonsDisabled(view, true);
@@ -70,11 +73,14 @@ export default function (view) {
 
             if (response.ok) {
                 const health = body.Health || body.health || {};
+                const ffmpeg = body.Ffmpeg || body.ffmpeg || {};
                 const version = readValue(health, ['Version', 'version']);
                 const providerName = readValue(health, ['ProviderName', 'providerName', 'provider_name']);
+                const ffmpegPath = readValue(ffmpeg, ['ffmpegPath', 'FfmpegPath'], '未找到');
+                const ffprobePath = readValue(ffmpeg, ['ffprobePath', 'FfprobePath'], '未找到');
                 setMessage(
                     messageElement,
-                    `连接成功。版本：${version || '-'}，字幕源：${providerName || '-'}。`,
+                    `连接成功。服务版本：${version || '-'}，字幕源：${providerName || '-'}，FFmpeg：${ffmpegPath}，FFprobe：${ffprobePath}。`,
                     false);
                 return;
             }
@@ -85,7 +91,7 @@ export default function (view) {
         }).catch(() => {
             Dashboard.hideLoadingMsg();
             setButtonsDisabled(view, false);
-            const errorMessage = '连接失败，请检查地址、网络或服务状态。';
+            const errorMessage = '连接失败，请检查服务地址、FFmpeg 路径和网络状态。';
             setMessage(messageElement, errorMessage, true);
             Dashboard.processErrorResponse({ statusText: errorMessage });
         });
@@ -102,6 +108,9 @@ export default function (view) {
             config.RequestTimeoutSeconds = formValue.RequestTimeoutSeconds;
             config.EnableAutoHashPrecompute = formValue.EnableAutoHashPrecompute;
             config.HashPrecomputeConcurrency = formValue.HashPrecomputeConcurrency;
+            config.EnableAutoVideoConvertToMkv = formValue.EnableAutoVideoConvertToMkv;
+            config.VideoConvertConcurrency = formValue.VideoConvertConcurrency;
+            config.FfmpegExecutablePath = formValue.FfmpegExecutablePath;
 
             return ApiClient.updatePluginConfiguration(SubtitlesToolsConfig.pluginUniqueId, config);
         }).then(result => {

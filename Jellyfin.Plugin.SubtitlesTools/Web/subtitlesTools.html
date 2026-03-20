@@ -5,7 +5,10 @@
                 <div class="verticalSection">
                     <h2 class="sectionTitle">Subtitles Tools</h2>
                     <div class="fieldDescription">
-                        该插件仅支持 Jellyfin 10.11.6 及更新的 10.11 系列，并且当前只处理本地电影、剧集文件。
+                        当前版本面向 Jellyfin 10.11.6 及更新的 10.11 系列，只处理本地 Movie 和 Episode 文件。
+                    </div>
+                    <div class="fieldDescription">
+                        插件现在统一走“原始 CID/GCID -> 迅雷搜字幕 -> 转 UTF-8 SRT -> 软字幕内封到 MKV”的流程，不再保留外挂字幕能力。
                     </div>
                     <div class="fieldDescription">
                         Python 服务端项目：
@@ -20,23 +23,47 @@
 
                 <div class="inputContainer">
                     <input is="emby-input" id="requestTimeoutSeconds" type="number" min="1" max="120" label="请求超时（秒）" />
-                    <div class="fieldDescription">建议保持 10 秒，网络或磁盘较慢时可适当增大。</div>
+                    <div class="fieldDescription">建议保持 10 秒，网络较慢时可适当调大。</div>
                 </div>
 
                 <div class="checkboxContainer checkboxContainer-withDescription">
                     <label class="emby-checkbox-label">
                         <input is="emby-checkbox" id="enableAutoHashPrecompute" type="checkbox" />
-                        <span>新增媒体入库后自动预计算视频哈希</span>
+                        <span>新视频入库后自动计算原始 CID/GCID</span>
                     </label>
                     <div class="fieldDescription">
-                        默认关闭。开启后仅处理 Movie 和 Episode，且只处理本地可直接读取的媒体文件。
+                        默认开启。该哈希档案会在视频转成 MKV 后继续保留，后续检索迅雷字幕始终优先使用原始哈希。
                     </div>
                 </div>
 
                 <div class="inputContainer">
-                    <input is="emby-input" id="hashPrecomputeConcurrency" type="number" min="1" max="8" label="视频哈希预计算并发数" />
+                    <input is="emby-input" id="hashPrecomputeConcurrency" type="number" min="1" max="8" label="哈希后台并发数" />
                     <div class="fieldDescription">
-                        默认 1。网络盘建议保持 1，本地 SSD 可根据机器性能适当提高。手动补算入口在 Jellyfin 的“计划任务”页面。
+                        仅在关闭“自动转 MKV”时生效。网络盘建议保持 1，本地 SSD 可视情况调大。
+                    </div>
+                </div>
+
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label class="emby-checkbox-label">
+                        <input is="emby-checkbox" id="enableAutoVideoConvertToMkv" type="checkbox" />
+                        <span>新视频入库后自动转换为 MKV</span>
+                    </label>
+                    <div class="fieldDescription">
+                        默认开启。转换前一定会先确保原始 CID/GCID 已落档；分段电影按逐段自动转换。
+                    </div>
+                </div>
+
+                <div class="inputContainer">
+                    <input is="emby-input" id="videoConvertConcurrency" type="number" min="1" max="4" label="视频转换并发数" />
+                    <div class="fieldDescription">
+                        默认 1。转换是重 I/O 操作，网络盘和机械盘不建议开太高。
+                    </div>
+                </div>
+
+                <div class="inputContainer">
+                    <input is="emby-input" id="ffmpegExecutablePath" type="text" label="FFmpeg 可执行文件路径（可选）" />
+                    <div class="fieldDescription">
+                        留空时会优先自动探测 Jellyfin 自带 FFmpeg，再回退到系统 PATH。
                     </div>
                 </div>
 

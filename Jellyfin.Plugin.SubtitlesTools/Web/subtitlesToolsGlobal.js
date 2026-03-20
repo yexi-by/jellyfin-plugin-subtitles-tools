@@ -57,10 +57,6 @@
                 cursor: pointer;
             }
 
-            .subtitles-tools-fab:hover {
-                filter: brightness(1.06);
-            }
-
             .subtitles-tools-overlay {
                 position: fixed;
                 inset: 0;
@@ -78,7 +74,7 @@
             }
 
             .subtitles-tools-panel {
-                width: min(1100px, 100%);
+                width: min(1180px, 100%);
                 max-height: calc(100vh - 48px);
                 overflow: hidden;
                 display: flex;
@@ -155,8 +151,7 @@
 
             .subtitles-tools-body {
                 display: grid;
-                grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-                gap: 0;
+                grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
                 min-height: 0;
                 flex: 1 1 auto;
                 overflow: hidden;
@@ -189,6 +184,9 @@
                 margin-top: 6px;
                 color: rgba(255, 255, 255, 0.68);
                 font-size: 12px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
             }
 
             .subtitles-tools-main {
@@ -226,45 +224,49 @@
                 line-height: 1.6;
             }
 
-            .subtitles-tools-existing-card,
-            .subtitles-tools-result-card,
+            .subtitles-tools-card,
             .subtitles-tools-summary-item {
                 border-radius: 18px;
                 padding: 16px;
                 background: rgba(255, 255, 255, 0.05);
             }
 
-            .subtitles-tools-existing-card {
-                display: grid;
-                gap: 10px;
-            }
-
-            .subtitles-tools-existing-list,
-            .subtitles-tools-results,
+            .subtitles-tools-card-list,
             .subtitles-tools-summary-list {
                 display: grid;
                 gap: 12px;
             }
 
-            .subtitles-tools-existing-header,
-            .subtitles-tools-result-name {
+            .subtitles-tools-card-title {
                 font-size: 15px;
                 font-weight: 700;
             }
 
-            .subtitles-tools-existing-meta,
-            .subtitles-tools-result-meta {
+            .subtitles-tools-card-meta {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 8px 14px;
                 font-size: 12px;
                 color: rgba(255, 255, 255, 0.72);
+                margin-top: 8px;
             }
 
             .subtitles-tools-actions {
                 display: flex;
                 flex-wrap: wrap;
                 gap: 8px;
+                margin-top: 12px;
+            }
+
+            .subtitles-tools-pill {
+                display: inline-flex;
+                align-items: center;
+                border-radius: 999px;
+                padding: 4px 10px;
+                font-size: 12px;
+                font-weight: 600;
+                background: rgba(255, 255, 255, 0.08);
+                color: rgba(255, 255, 255, 0.82);
             }
 
             @media (max-width: 900px) {
@@ -305,7 +307,7 @@
 
         root = document.createElement('div');
         root.id = CONFIG.rootId;
-        root.innerHTML = '<button class="subtitles-tools-fab" type="button">分段字幕</button>';
+        root.innerHTML = '<button class="subtitles-tools-fab" type="button">内封字幕</button>';
         root.querySelector('button').addEventListener('click', openOverlay);
         document.body.appendChild(root);
         return root;
@@ -488,26 +490,31 @@
         statusElement.textContent = message || '';
     }
 
-    function renderExistingSubtitles(part) {
-        if (!part || !Array.isArray(part.ExistingSubtitles) || part.ExistingSubtitles.length === 0) {
-            return '<div class="subtitles-tools-summary-item">当前没有已保存的外部字幕。</div>';
+    function renderEmbeddedSubtitles(part) {
+        if (!part || !Array.isArray(part.EmbeddedSubtitles) || part.EmbeddedSubtitles.length === 0) {
+            return '<div class="subtitles-tools-summary-item">当前还没有内封字幕流。</div>';
         }
 
-        return part.ExistingSubtitles.map(item => `
-            <div class="subtitles-tools-existing-card">
-                <div class="subtitles-tools-existing-header">${escapeHtml(item.FileName)}</div>
-                <div class="subtitles-tools-existing-meta">
+        return part.EmbeddedSubtitles.map(item => `
+            <div class="subtitles-tools-card">
+                <div class="subtitles-tools-card-title">${escapeHtml(item.Title || `字幕流 #${item.StreamIndex}`)}</div>
+                <div class="subtitles-tools-card-meta">
+                    <span>绝对流索引：${escapeHtml(item.StreamIndex)}</span>
+                    <span>字幕流序号：${escapeHtml(item.SubtitleStreamIndex)}</span>
                     <span>语言：${escapeHtml(item.Language)}</span>
                     <span>格式：${escapeHtml(item.Format)}</span>
+                    <span>${item.IsPluginManaged ? '插件写入' : '非插件写入'}</span>
                 </div>
                 <div class="subtitles-tools-actions">
-                    <button
-                        class="subtitles-tools-button is-danger"
-                        type="button"
-                        data-action="delete-existing"
-                        data-subtitle-file="${escapeHtml(item.FileName)}">
-                        删除这条
-                    </button>
+                    ${item.IsPluginManaged ? `
+                        <button
+                            class="subtitles-tools-button is-danger"
+                            type="button"
+                            data-action="delete-embedded"
+                            data-stream-index="${escapeHtml(item.StreamIndex)}">
+                            删除这条内封字幕
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `).join('');
@@ -516,17 +523,17 @@
     function renderResults(partId) {
         const results = state.searchResults.get(partId) || [];
         if (results.length === 0) {
-            return '<div class="subtitles-tools-summary-item">当前还没有搜索结果。你可以先点击“搜索当前分段”。</div>';
+            return '<div class="subtitles-tools-summary-item">当前还没有搜索结果。你可以先点“搜索当前分段”。</div>';
         }
 
         return results.map(item => `
-            <div class="subtitles-tools-result-card">
-                <div class="subtitles-tools-result-name">${escapeHtml(item.DisplayName)}</div>
-                <div class="subtitles-tools-result-meta">
+            <div class="subtitles-tools-card">
+                <div class="subtitles-tools-card-title">${escapeHtml(item.DisplayName)}</div>
+                <div class="subtitles-tools-card-meta">
                     <span>语言：${escapeHtml(item.Language)}</span>
                     <span>格式：${escapeHtml(item.Format)}</span>
                     <span>分数：${escapeHtml(item.Score)}</span>
-                    <span>目标文件：${escapeHtml(item.TargetFileName)}</span>
+                    <span>临时文件：${escapeHtml(item.TemporarySrtFileName)}</span>
                 </div>
                 <div class="subtitles-tools-actions">
                     <button
@@ -534,7 +541,7 @@
                         type="button"
                         data-action="download-candidate"
                         data-subtitle-id="${escapeHtml(item.Id)}">
-                        下载到当前分段
+                        下载并内封到当前分段
                     </button>
                 </div>
             </div>
@@ -548,7 +555,7 @@
 
         return `
             <div class="subtitles-tools-section">
-                <h3>最近一次批量执行结果</h3>
+                <h3>最近一次批量任务结果</h3>
                 <div class="subtitles-tools-summary-list">
                     ${items.map(item => `
                         <div class="subtitles-tools-summary-item">
@@ -556,6 +563,23 @@
                             ${escapeHtml(item.Message || '')}
                         </div>
                     `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderCurrentPart(part) {
+        if (!part) {
+            return '<div class="subtitles-tools-summary-item">未找到当前分段。</div>';
+        }
+
+        return `
+            <div class="subtitles-tools-card">
+                <div class="subtitles-tools-card-title">${escapeHtml(part.Label)} · ${escapeHtml(part.FileName)}</div>
+                <div class="subtitles-tools-card-meta">
+                    <span>容器：${escapeHtml(part.Container || 'unknown')}</span>
+                    <span>${part.HasOriginalHash ? '原始 CID/GCID 已归档' : '原始 CID/GCID 尚未归档'}</span>
+                    <span>路径：${escapeHtml(part.MediaPath)}</span>
                 </div>
             </div>
         `;
@@ -569,8 +593,8 @@
         }
 
         const activePart = getActivePart();
+        const embeddedSubtitlesHtml = activePart ? renderEmbeddedSubtitles(activePart) : '';
         const searchResultsHtml = activePart ? renderResults(activePart.Id) : '<div class="subtitles-tools-summary-item">未找到当前分段。</div>';
-        const existingSubtitlesHtml = activePart ? renderExistingSubtitles(activePart) : '';
 
         overlay.innerHTML = `
             <div class="subtitles-tools-panel">
@@ -584,9 +608,11 @@
                     <button class="subtitles-tools-close" type="button" data-action="close">×</button>
                 </div>
                 <div class="subtitles-tools-toolbar">
-                    <button class="subtitles-tools-button is-secondary" type="button" data-action="refresh">刷新分段状态</button>
+                    <button class="subtitles-tools-button is-secondary" type="button" data-action="refresh">刷新状态</button>
                     <button class="subtitles-tools-button" type="button" data-action="search-part">搜索当前分段</button>
-                    <button class="subtitles-tools-button" type="button" data-action="download-best">一键全段最佳匹配下载</button>
+                    <button class="subtitles-tools-button" type="button" data-action="convert-part">转换当前分段为 MKV</button>
+                    <button class="subtitles-tools-button" type="button" data-action="convert-group">一键整组转换为 MKV</button>
+                    <button class="subtitles-tools-button" type="button" data-action="download-best">一键整组最佳匹配并内封</button>
                 </div>
                 <div class="subtitles-tools-toolbar">
                     <div class="subtitles-tools-status"></div>
@@ -600,27 +626,29 @@
                                 data-action="select-part"
                                 data-part-id="${escapeHtml(part.Id)}">
                                 <div>${escapeHtml(part.Label)}</div>
-                                <div class="subtitles-tools-part-meta">${escapeHtml(part.FileName)}</div>
+                                <div class="subtitles-tools-part-meta">
+                                    <span>${escapeHtml(part.FileName)}</span>
+                                    <span>${escapeHtml(part.Container || 'unknown')}</span>
+                                    <span>${part.HasOriginalHash ? '已归档旧哈希' : '未归档旧哈希'}</span>
+                                </div>
                             </button>
                         `).join('')}
                     </div>
                     <div class="subtitles-tools-main">
                         <div class="subtitles-tools-section">
                             <h3>当前分段</h3>
-                            <div class="subtitles-tools-summary-item">
-                                ${activePart ? `${escapeHtml(activePart.Label)} · ${escapeHtml(activePart.FileName)}` : '未找到当前分段。'}
-                            </div>
+                            ${renderCurrentPart(activePart)}
                             <div class="subtitles-tools-note">
-                                这个页面只负责把字幕下载到媒体目录，并管理已保存字幕。具体播放时启用哪条字幕，交给 Jellyfin 播放器自己选择。
+                                插件现在不再保留外挂字幕文件。下载字幕后会先转成临时 UTF-8 SRT，再写入当前分段的 MKV 容器；成功后会自动删除临时 SRT。
                             </div>
                         </div>
                         <div class="subtitles-tools-section">
-                            <h3>已保存字幕</h3>
-                            <div class="subtitles-tools-existing-list">${existingSubtitlesHtml}</div>
+                            <h3>当前已内封字幕流</h3>
+                            <div class="subtitles-tools-card-list">${embeddedSubtitlesHtml}</div>
                         </div>
                         <div class="subtitles-tools-section">
                             <h3>搜索结果</h3>
-                            <div class="subtitles-tools-results">${searchResultsHtml}</div>
+                            <div class="subtitles-tools-card-list">${searchResultsHtml}</div>
                         </div>
                         ${renderSummary(state.lastBatchItems)}
                     </div>
@@ -678,6 +706,33 @@
         return candidates.find(item => item.Id === subtitleId) || null;
     }
 
+    async function convertCurrentPart() {
+        const activePart = getActivePart();
+        if (!activePart) {
+            throw new Error('当前未选中有效分段。');
+        }
+
+        setStatus(`正在把 ${activePart.Label} 转换为 MKV……`, '');
+        const payload = await apiRequest(
+            `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/convert`,
+            'POST',
+            {});
+        state.lastBatchItems = [];
+        await refreshOverlayData();
+        setStatus(payload.Message || '当前分段转换完成。', 'success');
+    }
+
+    async function convertGroup() {
+        setStatus('正在按顺序转换整组分段为 MKV……', '');
+        const payload = await apiRequest(
+            `${CONFIG.apiRoot}/Items/${state.itemId}/convert-group`,
+            'POST',
+            {});
+        state.lastBatchItems = Array.isArray(payload.Items) ? payload.Items : [];
+        await refreshOverlayData();
+        setStatus(payload.Message || '整组转换完成。', payload.Status === 'completed' ? 'success' : '');
+    }
+
     async function downloadSelectedCandidate(subtitleId) {
         const activePart = getActivePart();
         if (!activePart) {
@@ -689,7 +744,7 @@
             throw new Error('未找到对应的字幕候选。');
         }
 
-        setStatus(`正在下载 ${candidate.DisplayName}……`, '');
+        setStatus(`正在下载并内封 ${candidate.DisplayName}……`, '');
         const payload = await apiRequest(
             `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/download`,
             'POST',
@@ -701,38 +756,43 @@
                 Language: candidate.Language
             });
 
-        if (payload.Status !== 'downloaded') {
-            throw new Error(payload.Message || '字幕下载失败。');
+        if (payload.Status !== 'embedded') {
+            throw new Error(payload.Message || '字幕内封失败。');
         }
 
         state.lastBatchItems = [];
         await refreshOverlayData();
-        setStatus(`字幕已保存为 ${payload.WrittenSubtitle.FileName}。`, 'success');
+        setStatus(payload.Message || '字幕已内封到当前分段。', 'success');
     }
 
-    async function deleteExistingSubtitle(subtitleFileName) {
+    async function deleteEmbeddedSubtitle(streamIndexText) {
         const activePart = getActivePart();
         if (!activePart) {
             throw new Error('当前未选中有效分段。');
         }
 
-        const confirmed = window.confirm(`确认删除 ${subtitleFileName} 吗？此操作会直接删除媒体目录中的字幕文件。`);
+        const streamIndex = Number.parseInt(streamIndexText, 10);
+        if (!Number.isInteger(streamIndex)) {
+            throw new Error('字幕流索引无效。');
+        }
+
+        const confirmed = window.confirm(`确认删除内封字幕流 #${streamIndex} 吗？当前仅允许删除插件写入的字幕流。`);
         if (!confirmed) {
             setStatus('已取消删除。', '');
             return;
         }
 
-        setStatus(`正在删除 ${subtitleFileName}……`, '');
+        setStatus(`正在删除内封字幕流 #${streamIndex}……`, '');
         const payload = await apiRequest(
-            `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/delete-subtitle`,
+            `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/delete-embedded-subtitle`,
             'POST',
-            { SubtitleFileName: subtitleFileName });
+            { StreamIndex: streamIndex });
         await refreshOverlayData();
-        setStatus(payload.Message || `已删除 ${subtitleFileName}。`, 'success');
+        setStatus(payload.Message || `已删除内封字幕流 #${streamIndex}。`, 'success');
     }
 
     async function runDownloadBest() {
-        setStatus('正在为所有分段选择最佳字幕……', '');
+        setStatus('正在为整组分段搜索最佳字幕并内封……', '');
         const payload = await apiRequest(
             `${CONFIG.apiRoot}/Items/${state.itemId}/download-best`,
             'POST',
@@ -740,7 +800,7 @@
 
         state.lastBatchItems = Array.isArray(payload.Items) ? payload.Items : [];
         await refreshOverlayData();
-        setStatus(payload.Message || '批量处理已完成。', payload.Status === 'completed' ? 'success' : '');
+        setStatus(payload.Message || '整组字幕内封完成。', payload.Status === 'completed' ? 'success' : '');
     }
 
     async function handleOverlayAction(event) {
@@ -775,6 +835,16 @@
                 return;
             }
 
+            if (action === 'convert-part') {
+                await convertCurrentPart();
+                return;
+            }
+
+            if (action === 'convert-group') {
+                await convertGroup();
+                return;
+            }
+
             if (action === 'download-best') {
                 await runDownloadBest();
                 return;
@@ -786,9 +856,9 @@
                 return;
             }
 
-            if (action === 'delete-existing') {
-                const subtitleFileName = event.currentTarget.getAttribute('data-subtitle-file');
-                await deleteExistingSubtitle(subtitleFileName);
+            if (action === 'delete-embedded') {
+                const streamIndex = event.currentTarget.getAttribute('data-stream-index');
+                await deleteEmbeddedSubtitle(streamIndex);
             }
         } catch (error) {
             setStatus(error.message || '请求失败。', 'error');

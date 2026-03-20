@@ -33,10 +33,14 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<VideoHashCalculator>();
         serviceCollection.AddSingleton<VideoHashCacheService>();
         serviceCollection.AddSingleton<VideoHashResolverService>();
+        serviceCollection.AddSingleton<OriginalVideoHashArchiveService>();
         serviceCollection.AddSingleton<VideoHashBackfillService>();
         serviceCollection.AddSingleton<SubtitlesToolsApiClient>();
         serviceCollection.AddSingleton<SubtitleMetadataService>();
-        serviceCollection.AddSingleton<SidecarSubtitleService>();
+        serviceCollection.AddSingleton<FfmpegProcessService>();
+        serviceCollection.AddSingleton<VideoContainerConversionService>();
+        serviceCollection.AddSingleton<SubtitleSrtConversionService>();
+        serviceCollection.AddSingleton<EmbeddedSubtitleService>();
         serviceCollection.AddSingleton<MultipartMediaParserService>();
         serviceCollection.AddSingleton<MultipartSubtitleManagerService>();
         serviceCollection.AddSingleton<PrecomputeMissingHashesScheduledTask>();

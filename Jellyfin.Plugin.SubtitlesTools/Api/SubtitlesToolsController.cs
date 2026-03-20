@@ -15,8 +15,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Jellyfin.Plugin.SubtitlesTools.Api;
 
 /// <summary>
-/// 提供插件配置测试、分段字幕管理和字幕文件删除所需的接口。
-/// 当前版本只负责下载和管理 sidecar 字幕，不再干预播放器实际启用哪条字幕。
+/// 提供插件配置测试、分段转换、字幕搜索、下载内封和字幕流删除所需的接口。
+/// 当前版本不再管理外挂字幕，而是统一面向 MKV 内封字幕。
 /// </summary>
 [ApiController]
 [Produces(MediaTypeNames.Application.Json)]
@@ -24,6 +24,7 @@ namespace Jellyfin.Plugin.SubtitlesTools.Api;
 public sealed class SubtitlesToolsController : ControllerBase
 {
     private readonly SubtitlesToolsApiClient _apiClient;
+    private readonly FfmpegProcessService _ffmpegProcessService;
     private readonly MultipartSubtitleManagerService _multipartSubtitleManagerService;
 
     /// <summary>
@@ -31,18 +32,19 @@ public sealed class SubtitlesToolsController : ControllerBase
     /// </summary>
     public SubtitlesToolsController(
         SubtitlesToolsApiClient apiClient,
+        FfmpegProcessService ffmpegProcessService,
         MultipartSubtitleManagerService multipartSubtitleManagerService)
     {
         _apiClient = apiClient;
+        _ffmpegProcessService = ffmpegProcessService;
         _multipartSubtitleManagerService = multipartSubtitleManagerService;
     }
 
     /// <summary>
-    /// 使用当前表单配置测试与 Python 服务端的连通性。
-    /// 这个接口只允许具备字幕管理权限的管理员调用，避免普通用户借此探测服务配置。
+    /// 使用当前表单配置测试 Python 服务端和 FFmpeg 的可用性。
     /// </summary>
     /// <param name="body">待测试的连接配置。</param>
-    /// <returns>健康检查结果。</returns>
+    /// <returns>检查结果。</returns>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/TestConnection")]
     [Authorize(Policy = Policies.SubtitleManagement)]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -56,20 +58,36 @@ public sealed class SubtitlesToolsController : ControllerBase
             var configuration = new PluginConfiguration
             {
                 ServiceBaseUrl = PluginConfiguration.NormalizeServiceBaseUrl(body.ServiceBaseUrl),
-                RequestTimeoutSeconds = PluginConfiguration.NormalizeTimeoutSeconds(body.RequestTimeoutSeconds)
+                RequestTimeoutSeconds = PluginConfiguration.NormalizeTimeoutSeconds(body.RequestTimeoutSeconds),
+                EnableAutoHashPrecompute = body.EnableAutoHashPrecompute,
+                HashPrecomputeConcurrency = PluginConfiguration.NormalizeHashPrecomputeConcurrency(body.HashPrecomputeConcurrency),
+                EnableAutoVideoConvertToMkv = body.EnableAutoVideoConvertToMkv,
+                VideoConvertConcurrency = PluginConfiguration.NormalizeVideoConvertConcurrency(body.VideoConvertConcurrency),
+                FfmpegExecutablePath = PluginConfiguration.NormalizeFfmpegExecutablePath(body.FfmpegExecutablePath)
             };
 
             var result = await _apiClient.CheckHealthAsync(configuration, CancellationToken.None).ConfigureAwait(false);
+            var ffmpegValidation = _ffmpegProcessService.ValidateExecutables();
+
             return Ok(
                 new
                 {
                     Message = "连接成功。",
                     ServiceBaseUrl = result.ServiceBaseUrl,
                     TimeoutSeconds = result.TimeoutSeconds,
-                    Health = result.Health
+                    Health = result.Health,
+                    Ffmpeg = new
+                    {
+                        ffmpegPath = ffmpegValidation.FfmpegPath,
+                        ffprobePath = ffmpegValidation.FfprobePath
+                    }
                 });
         }
         catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+        catch (FileNotFoundException ex)
         {
             return BadRequest(new { Message = ex.Message });
         }
@@ -80,7 +98,7 @@ public sealed class SubtitlesToolsController : ControllerBase
     }
 
     /// <summary>
-    /// 获取媒体项的分段结构与现有字幕状态。
+    /// 获取媒体项的分段结构与内封字幕状态。
     /// </summary>
     /// <param name="itemId">Jellyfin 媒体项标识。</param>
     /// <param name="cancellationToken">取消令牌。</param>
@@ -113,10 +131,6 @@ public sealed class SubtitlesToolsController : ControllerBase
     /// <summary>
     /// 为指定分段搜索字幕候选。
     /// </summary>
-    /// <param name="itemId">Jellyfin 媒体项标识。</param>
-    /// <param name="partId">分段标识。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>分段搜索结果。</returns>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts/{partId}/search")]
     [ProducesResponseType(typeof(ManagedPartSearchResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -152,13 +166,84 @@ public sealed class SubtitlesToolsController : ControllerBase
     }
 
     /// <summary>
-    /// 将指定候选字幕下载到分段对应的 sidecar 文件。
+    /// 手动把当前分段转换为 MKV。
     /// </summary>
-    /// <param name="itemId">Jellyfin 媒体项标识。</param>
-    /// <param name="partId">分段标识。</param>
-    /// <param name="body">下载请求体。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>下载结果。</returns>
+    [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts/{partId}/convert")]
+    [ProducesResponseType(typeof(ManagedPartConvertResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ManagedPartConvertResponseDto>> ConvertPart(
+        [FromRoute] Guid itemId,
+        [FromRoute] string partId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _multipartSubtitleManagerService
+                .ConvertPartAsync(itemId, partId, cancellationToken)
+                .ConfigureAwait(false);
+            return Ok(result);
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { Message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+        catch (IOException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
+        }
+        catch (FfmpegExecutionException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// 一键把整组分段转换为 MKV。
+    /// </summary>
+    [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/convert-group")]
+    [ProducesResponseType(typeof(ManagedBatchOperationResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ManagedBatchOperationResponseDto>> ConvertGroup(
+        [FromRoute] Guid itemId,
+        [FromBody] ManagedConvertGroupRequestDto body,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+
+        try
+        {
+            var result = await _multipartSubtitleManagerService
+                .ConvertGroupAsync(itemId, body, cancellationToken)
+                .ConfigureAwait(false);
+            return Ok(result);
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { Message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// 下载指定候选字幕并内封到当前分段。
+    /// </summary>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts/{partId}/download")]
     [ProducesResponseType(typeof(ManagedPartDownloadResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -202,24 +287,23 @@ public sealed class SubtitlesToolsController : ControllerBase
         {
             return StatusCode(StatusCodes.Status502BadGateway, new { Message = ex.Message });
         }
+        catch (FfmpegExecutionException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
+        }
     }
 
     /// <summary>
-    /// 删除某个分段旁边的一条已保存字幕。
+    /// 删除当前分段的一条插件内封字幕流。
     /// </summary>
-    /// <param name="itemId">Jellyfin 媒体项标识。</param>
-    /// <param name="partId">分段标识。</param>
-    /// <param name="body">删除请求体。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>删除结果。</returns>
-    [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts/{partId}/delete-subtitle")]
-    [ProducesResponseType(typeof(ManagedDeleteSubtitleResponseDto), StatusCodes.Status200OK)]
+    [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts/{partId}/delete-embedded-subtitle")]
+    [ProducesResponseType(typeof(ManagedDeleteEmbeddedSubtitleResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ManagedDeleteSubtitleResponseDto>> DeleteSubtitle(
+    public async Task<ActionResult<ManagedDeleteEmbeddedSubtitleResponseDto>> DeleteEmbeddedSubtitle(
         [FromRoute] Guid itemId,
         [FromRoute] string partId,
-        [FromBody] ManagedDeleteSubtitleRequestDto body,
+        [FromBody] ManagedDeleteEmbeddedSubtitleRequestDto body,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(body);
@@ -227,7 +311,7 @@ public sealed class SubtitlesToolsController : ControllerBase
         try
         {
             var result = await _multipartSubtitleManagerService
-                .DeleteSubtitleAsync(itemId, partId, body, cancellationToken)
+                .DeleteEmbeddedSubtitleAsync(itemId, partId, body, cancellationToken)
                 .ConfigureAwait(false);
             return Ok(result);
         }
@@ -251,20 +335,20 @@ public sealed class SubtitlesToolsController : ControllerBase
         {
             return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
         }
+        catch (FfmpegExecutionException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
+        }
     }
 
     /// <summary>
-    /// 为所有分段分别搜索并下载第一名字幕候选。
+    /// 为所有分段分别搜索并内封第一名字幕候选。
     /// </summary>
-    /// <param name="itemId">Jellyfin 媒体项标识。</param>
-    /// <param name="body">批量下载请求体。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>批量下载结果。</returns>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/download-best")]
-    [ProducesResponseType(typeof(ManagedDownloadBestResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ManagedBatchOperationResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ManagedDownloadBestResponseDto>> DownloadBest(
+    public async Task<ActionResult<ManagedBatchOperationResponseDto>> DownloadBest(
         [FromRoute] Guid itemId,
         [FromBody] ManagedDownloadBestRequestDto body,
         CancellationToken cancellationToken)
@@ -290,6 +374,10 @@ public sealed class SubtitlesToolsController : ControllerBase
         {
             return StatusCode(StatusCodes.Status502BadGateway, new { Message = ex.Message });
         }
+        catch (FfmpegExecutionException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
+        }
     }
 }
 
@@ -307,4 +395,29 @@ public sealed class TestConnectionRequest
     /// 获取或设置请求超时秒数。
     /// </summary>
     public int RequestTimeoutSeconds { get; set; }
+
+    /// <summary>
+    /// 获取或设置是否自动预计算哈希。
+    /// </summary>
+    public bool EnableAutoHashPrecompute { get; set; }
+
+    /// <summary>
+    /// 获取或设置哈希预计算并发数。
+    /// </summary>
+    public int HashPrecomputeConcurrency { get; set; }
+
+    /// <summary>
+    /// 获取或设置是否自动转换为 MKV。
+    /// </summary>
+    public bool EnableAutoVideoConvertToMkv { get; set; }
+
+    /// <summary>
+    /// 获取或设置视频转换并发数。
+    /// </summary>
+    public int VideoConvertConcurrency { get; set; }
+
+    /// <summary>
+    /// 获取或设置 FFmpeg 路径。
+    /// </summary>
+    public string? FfmpegExecutablePath { get; set; }
 }

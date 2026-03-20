@@ -2,20 +2,20 @@
   {
     "guid": "b812b763-a31d-4d19-bfcc-15b9eac432cb",
     "name": "Subtitles Tools",
-    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供自定义分段字幕管理、搜索、下载与删除能力。",
-    "overview": "计算本地视频 CID/GCID，在详情页提供分段字幕管理入口，支持逐段搜索、逐段下载、一键全段最佳匹配，并把字幕以“视频名.清洗后的原字幕名.扩展名”形式写入媒体目录，供 Jellyfin 播放器自行选择。",
+    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供原始哈希归档、自动转 MKV、字幕转 SRT 以及 MKV 软字幕内封能力。",
+    "overview": "插件会为本地视频保存原始 CID/GCID，在详情页提供内封字幕管理入口，支持逐段或整组转换为 MKV、逐段搜索迅雷字幕、下载后自动转临时 SRT 并写入 MKV，最终不再依赖外挂字幕文件。",
     "owner": "yexi-by",
     "category": "Metadata",
     "repositoryUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools",
     "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
     "versions": [
       {
-        "version": "0.4.1.0",
-        "changelog": "移除“记住字幕并自动切换”功能，改为纯字幕下载与管理模式；下载后的字幕会按“视频名.清洗后的原字幕名.扩展名”命名并允许多条并存，同时在分段字幕页面新增已保存字幕删除能力。",
+        "version": "0.5.0.0",
+        "changelog": "插件改造成“自动转 MKV + 内封 SRT”方案：新视频可自动归档原始 CID/GCID 并自动转为 MKV，字幕下载后统一转成临时 UTF-8 SRT 再软封装进视频，详情页新增当前分段/整组转换入口与内封字幕流删除能力，同时彻底取消外挂字幕模式。",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.4.1.0/Jellyfin.Plugin.SubtitlesTools_0.4.1.0.zip",
-        "checksum": "211245B253E33016F2BD5A90ADC2DC58",
-        "timestamp": "2026-03-20T19:01:05Z"
+        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.5.0.0/Jellyfin.Plugin.SubtitlesTools_0.5.0.0.zip",
+        "checksum": "44B070AF76DFE5379E7DAACEEB382A3F",
+        "timestamp": "2026-03-21T00:00:00Z"
       }
     ]
   }

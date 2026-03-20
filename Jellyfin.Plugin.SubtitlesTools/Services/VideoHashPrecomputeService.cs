@@ -13,15 +13,18 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 在插件后台持续消费“自动预计算”队列。
-/// 该服务仅处理新增媒体入库后的自动预计算，不负责手动全库回填。
+/// 在插件后台持续消费“新视频入库后的自动处理”队列。
+/// 该服务负责两件事：
+/// 1. 先为新媒体确保原始 CID/GCID 已被持久化。
+/// 2. 若配置开启，则继续把该媒体自动转换为 MKV。
 /// </summary>
 public sealed class VideoHashPrecomputeService : BackgroundService
 {
     private readonly record struct HashPrecomputeWorkItem(string MediaPath, string TraceId, bool IsAutomatic);
 
     private readonly ILibraryManager _libraryManager;
-    private readonly VideoHashResolverService _videoHashResolverService;
+    private readonly OriginalVideoHashArchiveService _originalVideoHashArchiveService;
+    private readonly VideoContainerConversionService _videoContainerConversionService;
     private readonly ILogger<VideoHashPrecomputeService> _logger;
     private readonly Channel<HashPrecomputeWorkItem> _queue = Channel.CreateUnbounded<HashPrecomputeWorkItem>(
         new UnboundedChannelOptions
@@ -32,18 +35,21 @@ public sealed class VideoHashPrecomputeService : BackgroundService
     private readonly ConcurrentDictionary<string, byte> _scheduledMediaPaths = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// 初始化自动预计算后台服务。
+    /// 初始化自动哈希与自动转 MKV 后台服务。
     /// </summary>
     /// <param name="libraryManager">媒体库管理器。</param>
-    /// <param name="videoHashResolverService">视频哈希解析服务。</param>
+    /// <param name="originalVideoHashArchiveService">原始媒体哈希档案服务。</param>
+    /// <param name="videoContainerConversionService">视频容器转换服务。</param>
     /// <param name="logger">日志记录器。</param>
     public VideoHashPrecomputeService(
         ILibraryManager libraryManager,
-        VideoHashResolverService videoHashResolverService,
+        OriginalVideoHashArchiveService originalVideoHashArchiveService,
+        VideoContainerConversionService videoContainerConversionService,
         ILogger<VideoHashPrecomputeService> logger)
     {
         _libraryManager = libraryManager;
-        _videoHashResolverService = videoHashResolverService;
+        _originalVideoHashArchiveService = originalVideoHashArchiveService;
+        _videoContainerConversionService = videoContainerConversionService;
         _logger = logger;
     }
 
@@ -71,7 +77,7 @@ public sealed class VideoHashPrecomputeService : BackgroundService
         {
             runningTasks.RemoveAll(static task => task.IsCompleted);
 
-            if (runningTasks.Count >= GetNormalizedConfiguration().HashPrecomputeConcurrency)
+            if (runningTasks.Count >= GetEffectiveWorkerConcurrency())
             {
                 await Task.WhenAny(runningTasks).ConfigureAwait(false);
                 continue;
@@ -104,7 +110,7 @@ public sealed class VideoHashPrecomputeService : BackgroundService
 
     private void OnLibraryItemAdded(object? sender, ItemChangeEventArgs eventArgs)
     {
-        if (!GetNormalizedConfiguration().EnableAutoHashPrecompute)
+        if (!ShouldHandleNewItem())
         {
             return;
         }
@@ -117,7 +123,7 @@ public sealed class VideoHashPrecomputeService : BackgroundService
         if (_scheduledMediaPaths.TryAdd(mediaPath, 0))
         {
             _queue.Writer.TryWrite(new HashPrecomputeWorkItem(mediaPath, CreateTraceId(), IsAutomatic: true));
-            _logger.LogInformation("auto_hash_enqueue media_path={MediaPath}", mediaPath);
+            _logger.LogInformation("auto_media_enqueue media_path={MediaPath}", mediaPath);
         }
     }
 
@@ -125,33 +131,55 @@ public sealed class VideoHashPrecomputeService : BackgroundService
     {
         try
         {
-            if (workItem.IsAutomatic && !GetNormalizedConfiguration().EnableAutoHashPrecompute)
+            if (workItem.IsAutomatic && !ShouldHandleNewItem())
             {
                 _logger.LogDebug(
-                    "trace={TraceId} auto_hash_skip_disabled media_path={MediaPath}",
+                    "trace={TraceId} auto_media_skip_disabled media_path={MediaPath}",
                     workItem.TraceId,
                     workItem.MediaPath);
                 return;
             }
 
-            var metrics = await _videoHashResolverService
-                .ResolveAsync(workItem.MediaPath, cancellationToken, workItem.TraceId)
+            var configuration = GetNormalizedConfiguration();
+            var hashArchive = await _originalVideoHashArchiveService
+                .EnsureAsync(workItem.MediaPath, cancellationToken, workItem.TraceId)
                 .ConfigureAwait(false);
 
             _logger.LogInformation(
-                "trace={TraceId} auto_hash_complete media_path={MediaPath} cache_hit={CacheHit} cache_lookup_ms={CacheLookupMs:F2} compute_ms={ComputeMs:F2} cache_save_ms={CacheSaveMs:F2}",
+                "trace={TraceId} auto_hash_complete media_path={MediaPath} original_gcid={OriginalGcid} current_path={CurrentPath}",
                 workItem.TraceId,
                 workItem.MediaPath,
-                metrics.CacheHit,
-                metrics.CacheLookupMs,
-                metrics.ComputeMs,
-                metrics.CacheSaveMs);
+                hashArchive.OriginalGcid,
+                hashArchive.CurrentMediaPath);
+
+            if (!configuration.EnableAutoVideoConvertToMkv)
+            {
+                return;
+            }
+
+            var conversionResult = await _videoContainerConversionService
+                .EnsureMkvAsync(hashArchive.CurrentMediaPath, cancellationToken, workItem.TraceId)
+                .ConfigureAwait(false);
+
+            if (!string.Equals(hashArchive.CurrentMediaPath, conversionResult.OutputPath, StringComparison.OrdinalIgnoreCase))
+            {
+                await _originalVideoHashArchiveService
+                    .UpdateCurrentPathAsync(hashArchive, conversionResult.OutputPath, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            _logger.LogInformation(
+                "trace={TraceId} auto_video_convert_complete media_path={MediaPath} output_path={OutputPath} used_transcode_fallback={UsedTranscodeFallback}",
+                workItem.TraceId,
+                workItem.MediaPath,
+                conversionResult.OutputPath,
+                conversionResult.UsedTranscodeFallback);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or FfmpegExecutionException)
         {
             _logger.LogWarning(
                 ex,
-                "trace={TraceId} auto_hash_failed media_path={MediaPath}",
+                "trace={TraceId} auto_media_process_failed media_path={MediaPath}",
                 workItem.TraceId,
                 workItem.MediaPath);
         }
@@ -159,6 +187,23 @@ public sealed class VideoHashPrecomputeService : BackgroundService
         {
             _scheduledMediaPaths.TryRemove(workItem.MediaPath, out _);
         }
+    }
+
+    private bool ShouldHandleNewItem()
+    {
+        var configuration = GetNormalizedConfiguration();
+        return configuration.EnableAutoHashPrecompute || configuration.EnableAutoVideoConvertToMkv;
+    }
+
+    private int GetEffectiveWorkerConcurrency()
+    {
+        var configuration = GetNormalizedConfiguration();
+        if (configuration.EnableAutoVideoConvertToMkv)
+        {
+            return configuration.VideoConvertConcurrency;
+        }
+
+        return configuration.HashPrecomputeConcurrency;
     }
 
     private PluginConfiguration GetNormalizedConfiguration()
@@ -169,7 +214,10 @@ public sealed class VideoHashPrecomputeService : BackgroundService
             ServiceBaseUrl = PluginConfiguration.NormalizeServiceBaseUrl(rawConfiguration.ServiceBaseUrl),
             RequestTimeoutSeconds = PluginConfiguration.NormalizeTimeoutSeconds(rawConfiguration.RequestTimeoutSeconds),
             EnableAutoHashPrecompute = rawConfiguration.EnableAutoHashPrecompute,
-            HashPrecomputeConcurrency = PluginConfiguration.NormalizeHashPrecomputeConcurrency(rawConfiguration.HashPrecomputeConcurrency)
+            HashPrecomputeConcurrency = PluginConfiguration.NormalizeHashPrecomputeConcurrency(rawConfiguration.HashPrecomputeConcurrency),
+            EnableAutoVideoConvertToMkv = rawConfiguration.EnableAutoVideoConvertToMkv,
+            VideoConvertConcurrency = PluginConfiguration.NormalizeVideoConvertConcurrency(rawConfiguration.VideoConvertConcurrency),
+            FfmpegExecutablePath = PluginConfiguration.NormalizeFfmpegExecutablePath(rawConfiguration.FfmpegExecutablePath)
         };
     }
 }

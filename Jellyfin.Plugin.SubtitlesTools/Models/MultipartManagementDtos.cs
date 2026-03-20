@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace Jellyfin.Plugin.SubtitlesTools.Models;
 
 /// <summary>
-/// 表示媒体项的分段字幕管理首页响应。
+/// 表示媒体项的分段转换与内封字幕管理首页响应。
 /// </summary>
 public sealed class ManagedItemPartsResponseDto
 {
@@ -59,9 +59,14 @@ public sealed class ManagedMediaPartDto
     public string Label { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置分段文件名。
+    /// 获取或设置当前实际媒体文件名。
     /// </summary>
     public string FileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置当前实际媒体完整路径。
+    /// </summary>
+    public string MediaPath { get; set; } = string.Empty;
 
     /// <summary>
     /// 获取或设置分段类型。
@@ -79,25 +84,40 @@ public sealed class ManagedMediaPartDto
     public bool IsCurrent { get; set; }
 
     /// <summary>
-    /// 获取或设置当前分段旁边已存在的外部字幕文件。
+    /// 获取或设置当前容器格式。
     /// </summary>
-    public List<ExistingSubtitleDto> ExistingSubtitles { get; set; } = [];
+    public string Container { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置是否已经保留原始哈希档案。
+    /// </summary>
+    public bool HasOriginalHash { get; set; }
+
+    /// <summary>
+    /// 获取或设置当前分段内封的字幕流列表。
+    /// </summary>
+    public List<ManagedEmbeddedSubtitleDto> EmbeddedSubtitles { get; set; } = [];
 }
 
 /// <summary>
-/// 表示存在于媒体目录中的 sidecar 字幕文件。
+/// 表示媒体容器中的一条字幕流。
 /// </summary>
-public sealed class ExistingSubtitleDto
+public sealed class ManagedEmbeddedSubtitleDto
 {
     /// <summary>
-    /// 获取或设置稳定标识。
+    /// 获取或设置 FFprobe 返回的绝对流索引。
     /// </summary>
-    public string Id { get; set; } = string.Empty;
+    public int StreamIndex { get; set; }
 
     /// <summary>
-    /// 获取或设置字幕文件名。
+    /// 获取或设置该字幕在字幕流集合中的相对序号。
     /// </summary>
-    public string FileName { get; set; } = string.Empty;
+    public int SubtitleStreamIndex { get; set; }
+
+    /// <summary>
+    /// 获取或设置字幕轨标题。
+    /// </summary>
+    public string Title { get; set; } = string.Empty;
 
     /// <summary>
     /// 获取或设置三字母语言码。
@@ -105,9 +125,14 @@ public sealed class ExistingSubtitleDto
     public string Language { get; set; } = "und";
 
     /// <summary>
-    /// 获取或设置字幕格式。
+    /// 获取或设置字幕编码格式。
     /// </summary>
     public string Format { get; set; } = "srt";
+
+    /// <summary>
+    /// 获取或设置是否为插件写入的字幕轨。
+    /// </summary>
+    public bool IsPluginManaged { get; set; }
 }
 
 /// <summary>
@@ -121,7 +146,7 @@ public sealed class ManagedPartSearchResponseDto
     public string PartId { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置实际命中的搜索方式。
+    /// 获取或设置命中的查询方式。
     /// </summary>
     public string MatchedBy { get; set; } = string.Empty;
 
@@ -202,13 +227,13 @@ public sealed class ManagedSubtitleCandidateDto
     public string? ExtraName { get; set; }
 
     /// <summary>
-    /// 获取或设置预计写入的目标字幕文件名。
+    /// 获取或设置临时 SRT 文件名。
     /// </summary>
-    public string TargetFileName { get; set; } = string.Empty;
+    public string TemporarySrtFileName { get; set; } = string.Empty;
 }
 
 /// <summary>
-/// 表示手动下载某条候选字幕时的请求体。
+/// 表示下载并内封字幕时的请求体。
 /// </summary>
 public sealed class ManagedPartDownloadRequestDto
 {
@@ -239,7 +264,7 @@ public sealed class ManagedPartDownloadRequestDto
 }
 
 /// <summary>
-/// 表示单分段下载动作的结果。
+/// 表示单分段下载并内封动作的结果。
 /// </summary>
 public sealed class ManagedPartDownloadResponseDto
 {
@@ -254,26 +279,25 @@ public sealed class ManagedPartDownloadResponseDto
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置成功写入的字幕信息。
+    /// 获取或设置当前媒体路径。
     /// </summary>
-    public ManagedWrittenSubtitleDto? WrittenSubtitle { get; set; }
-}
+    public string MediaPath { get; set; } = string.Empty;
 
-/// <summary>
-/// 表示删除某条已保存字幕时的请求体。
-/// </summary>
-public sealed class ManagedDeleteSubtitleRequestDto
-{
     /// <summary>
-    /// 获取或设置要删除的字幕文件名。
+    /// 获取或设置当前容器格式。
     /// </summary>
-    public string SubtitleFileName { get; set; } = string.Empty;
+    public string Container { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置成功写入的字幕流信息。
+    /// </summary>
+    public ManagedEmbeddedSubtitleDto? EmbeddedSubtitle { get; set; }
 }
 
 /// <summary>
-/// 表示删除某条已保存字幕后的结果。
+/// 表示手动转换单个分段的结果。
 /// </summary>
-public sealed class ManagedDeleteSubtitleResponseDto
+public sealed class ManagedPartConvertResponseDto
 {
     /// <summary>
     /// 获取或设置结果状态。
@@ -286,22 +310,71 @@ public sealed class ManagedDeleteSubtitleResponseDto
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置被删除的字幕文件名。
+    /// 获取或设置转换后的媒体路径。
     /// </summary>
-    public string DeletedSubtitleFileName { get; set; } = string.Empty;
+    public string MediaPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置转换后的容器格式。
+    /// </summary>
+    public string Container { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置是否使用了自动转码回退。
+    /// </summary>
+    public bool UsedTranscodeFallback { get; set; }
 }
 
 /// <summary>
-/// 表示一键最佳匹配下载的请求体。
+/// 表示删除内封字幕流时的请求体。
+/// </summary>
+public sealed class ManagedDeleteEmbeddedSubtitleRequestDto
+{
+    /// <summary>
+    /// 获取或设置待删除的绝对流索引。
+    /// </summary>
+    public int StreamIndex { get; set; }
+}
+
+/// <summary>
+/// 表示删除内封字幕流后的结果。
+/// </summary>
+public sealed class ManagedDeleteEmbeddedSubtitleResponseDto
+{
+    /// <summary>
+    /// 获取或设置结果状态。
+    /// </summary>
+    public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置结果消息。
+    /// </summary>
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 获取或设置被删除的绝对流索引。
+    /// </summary>
+    public int DeletedStreamIndex { get; set; }
+}
+
+/// <summary>
+/// 表示一键整组内封字幕的请求体。
 /// </summary>
 public sealed class ManagedDownloadBestRequestDto
 {
 }
 
 /// <summary>
-/// 表示一键最佳匹配下载的整体结果。
+/// 表示一键整组转换的请求体。
 /// </summary>
-public sealed class ManagedDownloadBestResponseDto
+public sealed class ManagedConvertGroupRequestDto
+{
+}
+
+/// <summary>
+/// 表示批量操作的整体结果。
+/// </summary>
+public sealed class ManagedBatchOperationResponseDto
 {
     /// <summary>
     /// 获取或设置整体执行状态。
@@ -320,7 +393,7 @@ public sealed class ManagedDownloadBestResponseDto
 }
 
 /// <summary>
-/// 表示批量最佳匹配流程中单个分段的结果。
+/// 表示批量流程中单个分段的结果。
 /// </summary>
 public sealed class ManagedBatchPartResultDto
 {
@@ -345,28 +418,17 @@ public sealed class ManagedBatchPartResultDto
     public string Message { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置成功写入的字幕信息。
+    /// 获取或设置当前媒体路径。
     /// </summary>
-    public ManagedWrittenSubtitleDto? WrittenSubtitle { get; set; }
-}
-
-/// <summary>
-/// 表示成功写入媒体目录的字幕文件信息。
-/// </summary>
-public sealed class ManagedWrittenSubtitleDto
-{
-    /// <summary>
-    /// 获取或设置写入后的字幕文件名。
-    /// </summary>
-    public string FileName { get; set; } = string.Empty;
+    public string MediaPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置写入后的语言码。
+    /// 获取或设置当前容器格式。
     /// </summary>
-    public string Language { get; set; } = "und";
+    public string Container { get; set; } = string.Empty;
 
     /// <summary>
-    /// 获取或设置写入后的字幕格式。
+    /// 获取或设置成功写入的字幕流信息。
     /// </summary>
-    public string Format { get; set; } = "srt";
+    public ManagedEmbeddedSubtitleDto? EmbeddedSubtitle { get; set; }
 }

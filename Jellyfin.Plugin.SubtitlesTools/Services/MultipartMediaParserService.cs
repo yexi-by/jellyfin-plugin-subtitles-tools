@@ -69,8 +69,7 @@ public sealed class MultipartMediaParserService
         var matchedParts = new List<(FileInfo File, ParsedPartInfo Info)>();
         foreach (var siblingFile in currentFile.Directory.EnumerateFiles())
         {
-            if (!SupportedVideoExtensions.Contains(siblingFile.Extension)
-                || !string.Equals(siblingFile.Extension, currentFile.Extension, StringComparison.OrdinalIgnoreCase))
+            if (!SupportedVideoExtensions.Contains(siblingFile.Extension))
             {
                 continue;
             }
