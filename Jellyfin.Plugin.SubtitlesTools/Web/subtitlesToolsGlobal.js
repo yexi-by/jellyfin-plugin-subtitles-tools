@@ -25,6 +25,9 @@
         lastLocation: ''
     };
 
+    const REFRESH_RETRY_DELAY_MS = 1200;
+    const REFRESH_RETRY_ATTEMPTS = 6;
+
     function injectStyles() {
         if (document.getElementById(CONFIG.styleId)) {
             return;
@@ -351,6 +354,50 @@
             .replaceAll("'", '&#39;');
     }
 
+    function sleep(ms) {
+        return new Promise(resolve => window.setTimeout(resolve, ms));
+    }
+
+    function extractErrorMessage(error) {
+        if (!error) {
+            return '请求失败。';
+        }
+
+        if (typeof error === 'string' && error.trim()) {
+            return error.trim();
+        }
+
+        if (error.message && String(error.message).trim()) {
+            return String(error.message).trim();
+        }
+
+        if (error.payload) {
+            const payload = error.payload;
+            if (payload.Message && String(payload.Message).trim()) {
+                return String(payload.Message).trim();
+            }
+
+            if (payload.message && String(payload.message).trim()) {
+                return String(payload.message).trim();
+            }
+        }
+
+        if (Number.isInteger(error.status)) {
+            return `请求失败：${error.status}`;
+        }
+
+        return '请求失败。';
+    }
+
+    function getFileNameFromPath(path) {
+        if (!path) {
+            return '';
+        }
+
+        const segments = String(path).split(/[\\/]/);
+        return segments[segments.length - 1] || '';
+    }
+
     function extractGuid(source) {
         if (!source) {
             return null;
@@ -411,12 +458,11 @@
         return payload;
     }
 
-    async function fetchParts(itemId, forceReload) {
-        if (!forceReload && state.itemData && state.itemId === itemId) {
-            return state.itemData;
-        }
+    async function fetchPartsPayload(itemId) {
+        return apiRequest(`${CONFIG.apiRoot}/Items/${itemId}/parts`, 'GET');
+    }
 
-        const payload = await apiRequest(`${CONFIG.apiRoot}/Items/${itemId}/parts`, 'GET');
+    function applyPartsPayload(itemId, payload) {
         const isSameItem = state.itemId === itemId;
         const previousActivePartId = state.activePartId;
         state.itemId = itemId;
@@ -429,7 +475,15 @@
             state.searchResults = new Map();
             state.lastBatchItems = [];
         }
+    }
 
+    async function fetchParts(itemId, forceReload) {
+        if (!forceReload && state.itemData && state.itemId === itemId) {
+            return state.itemData;
+        }
+
+        const payload = await fetchPartsPayload(itemId);
+        applyPartsPayload(itemId, payload);
         return payload;
     }
 
@@ -488,6 +542,164 @@
         }
 
         statusElement.textContent = message || '';
+    }
+
+    function updateManagedPart(partId, updater) {
+        if (!state.itemData || !Array.isArray(state.itemData.Parts)) {
+            return;
+        }
+
+        const targetPart = state.itemData.Parts.find(part => part.Id === partId);
+        if (!targetPart) {
+            return;
+        }
+
+        updater(targetPart);
+    }
+
+    function applyOperationResultToPart(partId, result) {
+        if (!result) {
+            return;
+        }
+
+        updateManagedPart(partId, part => {
+            if (result.MediaPath) {
+                part.MediaPath = result.MediaPath;
+                part.FileName = getFileNameFromPath(result.MediaPath);
+            }
+
+            if (result.Container) {
+                part.Container = result.Container;
+            }
+
+            part.HasOriginalHash = true;
+
+            if (result.EmbeddedSubtitle) {
+                const nonPluginTracks = Array.isArray(part.EmbeddedSubtitles)
+                    ? part.EmbeddedSubtitles.filter(track => !track.IsPluginManaged)
+                    : [];
+                part.EmbeddedSubtitles = [...nonPluginTracks, result.EmbeddedSubtitle];
+            }
+        });
+    }
+
+    function applyDeleteResultToPart(partId, deletedStreamIndex) {
+        updateManagedPart(partId, part => {
+            if (!Array.isArray(part.EmbeddedSubtitles)) {
+                part.EmbeddedSubtitles = [];
+                return;
+            }
+
+            part.EmbeddedSubtitles = part.EmbeddedSubtitles.filter(track => track.StreamIndex !== deletedStreamIndex);
+        });
+    }
+
+    function applyBatchResults(items) {
+        if (!Array.isArray(items)) {
+            return;
+        }
+
+        items.forEach(item => {
+            if (item.Status === 'converted' || item.Status === 'embedded') {
+                applyOperationResultToPart(item.PartId, item);
+            }
+        });
+    }
+
+    function createBatchRefreshValidator(items) {
+        return payload => {
+            if (!payload || !Array.isArray(payload.Parts)) {
+                return false;
+            }
+
+            const successfulItems = items.filter(item => item.Status === 'converted' || item.Status === 'embedded');
+            if (successfulItems.length === 0) {
+                return true;
+            }
+
+            return successfulItems.every(item => {
+                const part = payload.Parts.find(payloadPart => payloadPart.Id === item.PartId);
+                if (!part) {
+                    return false;
+                }
+
+                if (item.MediaPath && part.MediaPath !== item.MediaPath) {
+                    return false;
+                }
+
+                if (item.Container && part.Container !== item.Container) {
+                    return false;
+                }
+
+                if (item.Status === 'embedded' && item.EmbeddedSubtitle) {
+                    return Array.isArray(part.EmbeddedSubtitles)
+                        && part.EmbeddedSubtitles.some(track =>
+                            track.Title === item.EmbeddedSubtitle.Title
+                            && track.Language === item.EmbeddedSubtitle.Language);
+                }
+
+                return true;
+            });
+        };
+    }
+
+    function createSinglePartRefreshValidator(partId, expectedResult) {
+        return payload => {
+            if (!payload || !Array.isArray(payload.Parts)) {
+                return false;
+            }
+
+            const part = payload.Parts.find(payloadPart => payloadPart.Id === partId);
+            if (!part) {
+                return false;
+            }
+
+            if (expectedResult.MediaPath && part.MediaPath !== expectedResult.MediaPath) {
+                return false;
+            }
+
+            if (expectedResult.Container && part.Container !== expectedResult.Container) {
+                return false;
+            }
+
+            if (expectedResult.EmbeddedSubtitle) {
+                return Array.isArray(part.EmbeddedSubtitles)
+                    && part.EmbeddedSubtitles.some(track =>
+                        track.Title === expectedResult.EmbeddedSubtitle.Title
+                        && track.Language === expectedResult.EmbeddedSubtitle.Language);
+            }
+
+            return true;
+        };
+    }
+
+    async function refreshOverlayDataWithRetry(validatePayload) {
+        const currentItemId = state.itemId || getCurrentItemId();
+        if (!currentItemId) {
+            throw new Error('当前页面没有可管理的媒体项。');
+        }
+
+        let lastError = null;
+        for (let attempt = 0; attempt < REFRESH_RETRY_ATTEMPTS; attempt += 1) {
+            try {
+                const payload = await fetchPartsPayload(currentItemId);
+                if (!validatePayload || validatePayload(payload)) {
+                    applyPartsPayload(currentItemId, payload);
+                    renderOverlay();
+                    return;
+                }
+            } catch (error) {
+                lastError = error;
+            }
+
+            if (attempt < REFRESH_RETRY_ATTEMPTS - 1) {
+                await sleep(REFRESH_RETRY_DELAY_MS);
+            }
+        }
+
+        if (lastError) {
+            throw lastError;
+        }
     }
 
     function renderEmbeddedSubtitles(part) {
@@ -718,7 +930,9 @@
             'POST',
             {});
         state.lastBatchItems = [];
-        await refreshOverlayData();
+        applyOperationResultToPart(activePart.Id, payload);
+        renderOverlay();
+        await refreshOverlayDataWithRetry(createSinglePartRefreshValidator(activePart.Id, payload));
         setStatus(payload.Message || '当前分段转换完成。', 'success');
     }
 
@@ -729,7 +943,9 @@
             'POST',
             {});
         state.lastBatchItems = Array.isArray(payload.Items) ? payload.Items : [];
-        await refreshOverlayData();
+        applyBatchResults(state.lastBatchItems);
+        renderOverlay();
+        await refreshOverlayDataWithRetry(createBatchRefreshValidator(state.lastBatchItems));
         setStatus(payload.Message || '整组转换完成。', payload.Status === 'completed' ? 'success' : '');
     }
 
@@ -761,7 +977,9 @@
         }
 
         state.lastBatchItems = [];
-        await refreshOverlayData();
+        applyOperationResultToPart(activePart.Id, payload);
+        renderOverlay();
+        await refreshOverlayDataWithRetry(createSinglePartRefreshValidator(activePart.Id, payload));
         setStatus(payload.Message || '字幕已内封到当前分段。', 'success');
     }
 
@@ -787,7 +1005,18 @@
             `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/delete-embedded-subtitle`,
             'POST',
             { StreamIndex: streamIndex });
-        await refreshOverlayData();
+        applyDeleteResultToPart(activePart.Id, streamIndex);
+        renderOverlay();
+        await refreshOverlayDataWithRetry(payloadResult => {
+            if (!payloadResult || !Array.isArray(payloadResult.Parts)) {
+                return false;
+            }
+
+            const refreshedPart = payloadResult.Parts.find(part => part.Id === activePart.Id);
+            return refreshedPart && Array.isArray(refreshedPart.EmbeddedSubtitles)
+                ? !refreshedPart.EmbeddedSubtitles.some(track => track.StreamIndex === streamIndex)
+                : false;
+        });
         setStatus(payload.Message || `已删除内封字幕流 #${streamIndex}。`, 'success');
     }
 
@@ -799,7 +1028,9 @@
             {});
 
         state.lastBatchItems = Array.isArray(payload.Items) ? payload.Items : [];
-        await refreshOverlayData();
+        applyBatchResults(state.lastBatchItems);
+        renderOverlay();
+        await refreshOverlayDataWithRetry(createBatchRefreshValidator(state.lastBatchItems));
         setStatus(payload.Message || '整组字幕内封完成。', payload.Status === 'completed' ? 'success' : '');
     }
 
@@ -861,7 +1092,7 @@
                 await deleteEmbeddedSubtitle(streamIndex);
             }
         } catch (error) {
-            setStatus(error.message || '请求失败。', 'error');
+            setStatus(extractErrorMessage(error), 'error');
         } finally {
             state.busy = false;
         }

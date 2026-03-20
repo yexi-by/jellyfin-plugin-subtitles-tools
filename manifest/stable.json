@@ -10,10 +10,10 @@
     "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
     "versions": [
       {
-        "version": "0.5.1.0",
-        "changelog": "修复插件配置页中 FFmpeg 可执行文件路径输入框被底部固定按钮遮挡的问题，补充容器内 FFmpeg 常见路径占位提示；其余“自动转 MKV + 内封 SRT”流程保持不变。",
+        "version": "0.5.2.0",
+        "changelog": "修复分段字幕页在批量转换/批量内封成功后仍停留旧 WMV 状态的问题：操作成功后会先本地更新分段状态，再延迟重试向 Jellyfin 拉取最新状态；同时前端错误提示改为优先显示后端真实错误，而不再统一显示“请求失败”。",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.5.1.0/Jellyfin.Plugin.SubtitlesTools_0.5.1.0.zip",
+        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.5.2.0/Jellyfin.Plugin.SubtitlesTools_0.5.2.0.zip",
         "checksum": "945CB03F20AB744E1EFE9F4B5EA81B64",
         "timestamp": "2026-03-20T22:06:58Z"
       }
