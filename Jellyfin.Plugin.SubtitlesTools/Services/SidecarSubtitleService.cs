@@ -27,7 +27,18 @@ public sealed class SidecarSubtitleService
         ".sub"
     };
 
-    private static readonly HashSet<char> InvalidFileNameCharacters = Path.GetInvalidFileNameChars().ToHashSet();
+    private static readonly HashSet<char> InvalidFileNameCharacters =
+    [
+        '<',
+        '>',
+        ':',
+        '"',
+        '/',
+        '\\',
+        '|',
+        '?',
+        '*'
+    ];
 
     private readonly SubtitleMetadataService _subtitleMetadataService;
 
