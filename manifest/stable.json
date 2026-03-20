@@ -2,8 +2,8 @@
   {
     "guid": "b812b763-a31d-4d19-bfcc-15b9eac432cb",
     "name": "Subtitles Tools",
-    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供远程字幕搜索与下载。",
-    "overview": "计算本地视频 CID/GCID，调用 subtitles-tools 服务搜索迅雷字幕，并以 Jellyfin 原生字幕提供器方式展示与下载。",
+    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供自定义分段字幕管理、搜索与下载。",
+    "overview": "计算本地视频 CID/GCID，在详情页提供分段字幕管理入口，支持逐段搜索、逐段下载，以及多分段媒体一键最佳匹配下载。",
     "owner": "yexi-by",
     "category": "Metadata",
     "repositoryUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools",
@@ -11,7 +11,7 @@
     "versions": [
       {
         "version": "0.2.0.0",
-        "changelog": "新增视频哈希预计算能力：可在配置页开启新增媒体自动预计算，并新增手动计划任务补算缺失 GCID/CID；同时保留可配置并发数，默认 1。",
+        "changelog": "新增插件自定义的分段字幕管理页面：不再依赖 Jellyfin 原生字幕搜索流程，支持单文件与 cd1/cd2/cd3、part1/part2 等多分段媒体的逐段搜索、逐段下载，以及一键全段最佳匹配下载。",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.2.0.0/Jellyfin.Plugin.SubtitlesTools_0.2.0.0.zip",
         "checksum": "A4B743F2C708F8904C824A78BFDAD710",
