@@ -13,8 +13,8 @@
                          "changelog":  "插件视频纳管链路与 video-transcoding-tool 对齐，新增安卓硬解高风险识别、Intel QSV 兼容修复重编码、QSV 设备配置与前端状态展示。",
                          "targetAbi":  "10.11.0.0",
                          "sourceUrl":  "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.0.0/Jellyfin.Plugin.SubtitlesTools_0.7.0.0.zip",
-                         "checksum":  "B0B34809FB13E4A3E80F5EB51E1D79AD",
-                         "timestamp":  "2026-03-21T21:31:33Z"
+                         "checksum":  "E9F5BD3FBE690BF8C18CCBAAB71819FF",
+                         "timestamp":  "2026-03-21T21:35:54Z"
                      }
                  ]
 }
