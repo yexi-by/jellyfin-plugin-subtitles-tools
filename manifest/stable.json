@@ -2,8 +2,8 @@
   {
     "guid": "b812b763-a31d-4d19-bfcc-15b9eac432cb",
     "name": "Subtitles Tools",
-    "description": "閫氳繃 subtitles-tools Python 鏈嶅姟涓?Jellyfin 鎻愪緵鍘熷鍝堝笇褰掓。銆佽嚜鍔ㄨ浆 MKV銆佸瓧骞曡浆 SRT 浠ュ強 MKV 杞瓧骞曞唴灏佽兘鍔涖€?,
-    "overview": "鎻掍欢浼氫负鏈湴瑙嗛淇濆瓨鍘熷 CID/GCID锛屽湪璇︽儏椤垫彁渚涘唴灏佸瓧骞曠鐞嗗叆鍙ｏ紝鏀寔閫愭鎴栨暣缁勮浆鎹负 MKV銆侀€愭鎼滅储杩呴浄瀛楀箷銆佷笅杞藉悗鑷姩杞复鏃?SRT 骞跺啓鍏?MKV锛屾渶缁堜笉鍐嶄緷璧栧鎸傚瓧骞曟枃浠躲€?,
+    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供原始哈希归档、自动转 MKV、字幕转 SRT 以及 MKV 软字幕内封能力。",
+    "overview": "插件会为本地视频保存原始 CID/GCID，在详情页提供内封字幕管理入口，支持逐段或整组转换为 MKV、逐段搜索迅雷字幕、下载后自动转临时 SRT 并写入 MKV，最终不再依赖外挂字幕文件。",
     "owner": "yexi-by",
     "category": "Metadata",
     "repositoryUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools",
@@ -11,11 +11,11 @@
     "versions": [
       {
         "version": "0.5.3.0",
-        "changelog": "淇鍒嗘瀛楀箷椤靛湪鎵归噺杞崲/鎵归噺鍐呭皝鎴愬姛鍚庝粛鍋滅暀鏃?WMV 鐘舵€佺殑闂锛氭搷浣滄垚鍔熷悗浼氬厛鏈湴鏇存柊鍒嗘鐘舵€侊紝鍐嶅欢杩熼噸璇曞悜 Jellyfin 鎷夊彇鏈€鏂扮姸鎬侊紱鍚屾椂鍓嶇閿欒鎻愮ず鏀逛负浼樺厛鏄剧ず鍚庣鐪熷疄閿欒锛岃€屼笉鍐嶇粺涓€鏄剧ず鈥滆姹傚け璐モ€濄€?,
+        "changelog": "调整插件配置页底部布局，修复 FFmpeg 可执行文件路径输入区域与按钮栏之间的显示冲突，方便直接填写和保存 FFmpeg 路径。",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.5.3.0/Jellyfin.Plugin.SubtitlesTools_0.5.3.0.zip",
-        "checksum": "F176924F1269A61D546DB43CAA282264",
-        "timestamp": "2026-03-20T22:22:33Z"
+        "checksum": "93E7E50DFE048520174E44351DFC6293",
+        "timestamp": "2026-03-21T12:16:21Z"
       }
     ]
   }
