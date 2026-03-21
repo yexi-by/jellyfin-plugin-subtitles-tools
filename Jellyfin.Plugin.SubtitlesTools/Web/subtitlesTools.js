@@ -13,7 +13,8 @@ function readForm(page) {
         RequestTimeoutSeconds: Number.parseInt(page.querySelector('#requestTimeoutSeconds').value, 10) || 10,
         EnableAutoVideoConvertToMkv: page.querySelector('#enableAutoVideoConvertToMkv').checked,
         VideoConvertConcurrency: Number.parseInt(page.querySelector('#videoConvertConcurrency').value, 10) || 1,
-        FfmpegExecutablePath: page.querySelector('#ffmpegExecutablePath').value.trim()
+        FfmpegExecutablePath: page.querySelector('#ffmpegExecutablePath').value.trim(),
+        QsvRenderDevicePath: page.querySelector('#qsvRenderDevicePath').value.trim()
     };
 }
 
@@ -46,6 +47,7 @@ export default function (view) {
             view.querySelector('#enableAutoVideoConvertToMkv').checked = config.EnableAutoVideoConvertToMkv !== false;
             view.querySelector('#videoConvertConcurrency').value = config.VideoConvertConcurrency || 1;
             view.querySelector('#ffmpegExecutablePath').value = config.FfmpegExecutablePath || '';
+            view.querySelector('#qsvRenderDevicePath').value = config.QsvRenderDevicePath || '/dev/dri/renderD128';
             setMessage(view.querySelector('#testConnectionMessage'), '', false);
             Dashboard.hideLoadingMsg();
         }).catch(() => {
@@ -70,13 +72,16 @@ export default function (view) {
             if (response.ok) {
                 const health = body.Health || body.health || {};
                 const ffmpeg = body.Ffmpeg || body.ffmpeg || {};
+                const video = body.Video || body.video || {};
                 const version = readValue(health, ['Version', 'version']);
                 const providerName = readValue(health, ['ProviderName', 'providerName', 'provider_name']);
                 const ffmpegPath = readValue(ffmpeg, ['ffmpegPath', 'FfmpegPath'], '未找到');
                 const ffprobePath = readValue(ffmpeg, ['ffprobePath', 'FfprobePath'], '未找到');
+                const qsvRenderDevicePath = readValue(video, ['qsvRenderDevicePath', 'QsvRenderDevicePath'], '未配置');
+                const supportsH264Qsv = video.supportsH264Qsv === true ? '支持' : '不支持';
                 setMessage(
                     messageElement,
-                    `连接成功。服务版本：${version || '-'}，字幕源：${providerName || '-'}，FFmpeg：${ffmpegPath}，FFprobe：${ffprobePath}。`,
+                    `连接成功。服务版本：${version || '-'}，字幕源：${providerName || '-'}，FFmpeg：${ffmpegPath}，FFprobe：${ffprobePath}，QSV 设备：${qsvRenderDevicePath}，h264_qsv：${supportsH264Qsv}。`,
                     false);
                 return;
             }
@@ -105,6 +110,7 @@ export default function (view) {
             config.EnableAutoVideoConvertToMkv = formValue.EnableAutoVideoConvertToMkv;
             config.VideoConvertConcurrency = formValue.VideoConvertConcurrency;
             config.FfmpegExecutablePath = formValue.FfmpegExecutablePath;
+            config.QsvRenderDevicePath = formValue.QsvRenderDevicePath;
 
             return ApiClient.updatePluginConfiguration(SubtitlesToolsConfig.pluginUniqueId, config);
         }).then(result => {

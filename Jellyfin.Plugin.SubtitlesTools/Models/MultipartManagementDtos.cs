@@ -54,6 +54,9 @@ public sealed class ManagedMediaPartDto
     public string Container { get; set; } = string.Empty;
     public bool IsManaged { get; set; }
     public bool ReadIdentityFromMetadata { get; set; }
+    public string RiskVerdict { get; set; } = string.Empty;
+    public string Pipeline { get; set; } = string.Empty;
+    public bool NeedsCompatibilityRepair { get; set; }
     public List<ManagedEmbeddedSubtitleDto> EmbeddedSubtitles { get; set; } = [];
 }
 
@@ -81,6 +84,9 @@ public sealed class ManagedPartSearchResponseDto
     public string MediaPath { get; set; } = string.Empty;
     public string Container { get; set; } = string.Empty;
     public bool IsManaged { get; set; }
+    public string RiskVerdict { get; set; } = string.Empty;
+    public string Pipeline { get; set; } = string.Empty;
+    public bool NeedsCompatibilityRepair { get; set; }
     public List<ManagedSubtitleCandidateDto> Items { get; set; } = [];
 }
 
@@ -120,6 +126,10 @@ public sealed class ManagedPartDownloadResponseDto
     public string MediaPath { get; set; } = string.Empty;
     public string Container { get; set; } = string.Empty;
     public bool IsManaged { get; set; }
+    public string RiskVerdict { get; set; } = string.Empty;
+    public string Pipeline { get; set; } = string.Empty;
+    public bool NeedsCompatibilityRepair { get; set; }
+    public bool UsedCompatibilityRepairReencode { get; set; }
     public ManagedEmbeddedSubtitleDto? EmbeddedSubtitle { get; set; }
 }
 
@@ -130,7 +140,10 @@ public sealed class ManagedPartConvertResponseDto
     public string MediaPath { get; set; } = string.Empty;
     public string Container { get; set; } = string.Empty;
     public bool IsManaged { get; set; }
-    public bool UsedTranscodeFallback { get; set; }
+    public string RiskVerdict { get; set; } = string.Empty;
+    public string Pipeline { get; set; } = string.Empty;
+    public bool NeedsCompatibilityRepair { get; set; }
+    public bool UsedCompatibilityRepairReencode { get; set; }
 }
 
 public sealed class ManagedDeleteEmbeddedSubtitleRequestDto
@@ -169,5 +182,9 @@ public sealed class ManagedBatchPartResultDto
     public string MediaPath { get; set; } = string.Empty;
     public string Container { get; set; } = string.Empty;
     public bool IsManaged { get; set; }
+    public string RiskVerdict { get; set; } = string.Empty;
+    public string Pipeline { get; set; } = string.Empty;
+    public bool NeedsCompatibilityRepair { get; set; }
+    public bool UsedCompatibilityRepairReencode { get; set; }
     public ManagedEmbeddedSubtitleDto? EmbeddedSubtitle { get; set; }
 }

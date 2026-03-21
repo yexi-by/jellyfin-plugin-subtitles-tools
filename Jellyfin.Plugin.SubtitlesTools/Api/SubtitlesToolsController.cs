@@ -8,6 +8,7 @@ using Jellyfin.Plugin.SubtitlesTools.Models;
 using Jellyfin.Plugin.SubtitlesTools.Services;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Net;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,7 @@ namespace Jellyfin.Plugin.SubtitlesTools.Api;
 
 /// <summary>
 /// 提供插件配置测试、分段纳管、字幕搜索、下载内封与内封字幕删除所需的接口。
-/// 当前版本只处理受管 MKV 的字幕内封，不再管理外挂字幕。
+/// 当前版本会先纳管并修复视频兼容性，再执行字幕搜索、下载和内封，不再管理外挂字幕。
 /// </summary>
 [ApiController]
 [Produces(MediaTypeNames.Application.Json)]
@@ -59,11 +60,17 @@ public sealed class SubtitlesToolsController : ControllerBase
                 RequestTimeoutSeconds = PluginConfiguration.NormalizeTimeoutSeconds(body.RequestTimeoutSeconds),
                 EnableAutoVideoConvertToMkv = body.EnableAutoVideoConvertToMkv,
                 VideoConvertConcurrency = PluginConfiguration.NormalizeVideoConvertConcurrency(body.VideoConvertConcurrency),
-                FfmpegExecutablePath = PluginConfiguration.NormalizeFfmpegExecutablePath(body.FfmpegExecutablePath)
+                FfmpegExecutablePath = PluginConfiguration.NormalizeFfmpegExecutablePath(body.FfmpegExecutablePath),
+                QsvRenderDevicePath = PluginConfiguration.NormalizeQsvRenderDevicePath(body.QsvRenderDevicePath)
             };
 
             var result = await _apiClient.CheckHealthAsync(configuration, CancellationToken.None).ConfigureAwait(false);
             var ffmpegValidation = _ffmpegProcessService.ValidateExecutables();
+            var supportsQsv = await _ffmpegProcessService.SupportsEncoderAsync("h264_qsv", CancellationToken.None).ConfigureAwait(false);
+            if (!OperatingSystem.IsWindows() && !QsvRenderDeviceExists(configuration.QsvRenderDevicePath))
+            {
+                return BadRequest(new { Message = $"未找到 Intel QSV 渲染设备：{configuration.QsvRenderDevicePath}" });
+            }
 
             return Ok(new
             {
@@ -75,6 +82,11 @@ public sealed class SubtitlesToolsController : ControllerBase
                 {
                     ffmpegPath = ffmpegValidation.FfmpegPath,
                     ffprobePath = ffmpegValidation.FfprobePath
+                },
+                Video = new
+                {
+                    qsvRenderDevicePath = configuration.QsvRenderDevicePath,
+                    supportsH264Qsv = supportsQsv
                 }
             });
         }
@@ -90,6 +102,16 @@ public sealed class SubtitlesToolsController : ControllerBase
         {
             return BadRequest(new { Message = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// 检查 Linux NAS 上的 QSV 渲染设备节点是否存在。
+    /// 这里读取的是管理员在插件配置页里填写的本机设备路径，只用于存在性校验，不参与其它文件系统操作。
+    /// </summary>
+    [SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "仅校验管理员配置的 QSV 设备节点是否存在，不执行读写或枚举。")]
+    private static bool QsvRenderDeviceExists(string renderDevicePath)
+    {
+        return System.IO.File.Exists(renderDevicePath);
     }
 
     /// <summary>
@@ -405,7 +427,7 @@ public sealed class TestConnectionRequest
     public int RequestTimeoutSeconds { get; set; }
 
     /// <summary>
-    /// 获取或设置是否在新视频入库后自动纳管为 MKV。
+    /// 获取或设置是否在新视频入库后自动纳管并修复安卓硬解兼容。
     /// </summary>
     public bool EnableAutoVideoConvertToMkv { get; set; }
 
@@ -418,4 +440,9 @@ public sealed class TestConnectionRequest
     /// 获取或设置 FFmpeg 路径。
     /// </summary>
     public string? FfmpegExecutablePath { get; set; }
+
+    /// <summary>
+    /// 获取或设置 Intel QSV 渲染设备路径。
+    /// </summary>
+    public string? QsvRenderDevicePath { get; set; }
 }

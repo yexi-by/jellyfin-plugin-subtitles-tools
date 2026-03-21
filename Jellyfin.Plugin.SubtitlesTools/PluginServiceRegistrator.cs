@@ -35,6 +35,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<SubtitlesToolsApiClient>();
         serviceCollection.AddSingleton<SubtitleMetadataService>();
         serviceCollection.AddSingleton<FfmpegProcessService>();
+        serviceCollection.AddSingleton<AndroidHwdecodeRiskService>();
         serviceCollection.AddSingleton<VideoContainerConversionService>();
         serviceCollection.AddSingleton<MkvMetadataIdentityService>();
         serviceCollection.AddSingleton<SubtitleSrtConversionService>();

@@ -1,22 +1,20 @@
-[
-  {
-    "guid": "b812b763-a31d-4d19-bfcc-15b9eac432cb",
-    "name": "Subtitles Tools",
-    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供视频自动纳管为 MKV、MKV 元数据 CID/GCID、字幕转 SRT 以及 MKV 软字幕内封能力。",
-    "overview": "插件只处理本地 Movie 和 Episode 文件。它会把视频统一纳管到 MKV，在 MKV 元数据中保存插件使用的 CID/GCID，并在详情页提供内封字幕管理入口，支持逐段或整组转换为 MKV、搜索迅雷字幕、下载后自动转临时 SRT 并写入 MKV，最终不再依赖外挂字幕文件。",
-    "owner": "yexi-by",
-    "category": "Metadata",
-    "repositoryUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools",
-    "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
-    "versions": [
-      {
-        "version": "0.6.1.0",
-        "changelog": "调整历史影片计划任务语义，明确为一键补算 CID/GCID 并纳管转换为 MKV，同时统一相关前端说明文案。",
-        "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.6.1.0/Jellyfin.Plugin.SubtitlesTools_0.6.1.0.zip",
-        "checksum": "A9320255D88796DB8275F50EF97FA8BC",
-        "timestamp": "2026-03-21T15:31:56Z"
-      }
-    ]
-  }
-]
+﻿{
+    "guid":  "b812b763-a31d-4d19-bfcc-15b9eac432cb",
+    "name":  "Subtitles Tools",
+    "description":  "通过 subtitles-tools Python 服务为 Jellyfin 提供视频自动纳管为 MKV、MKV 元数据 CID/GCID、字幕转 SRT 以及 MKV 软字幕内封能力。",
+    "overview":  "插件只处理本地 Movie 和 Episode 文件。它会把视频统一纳管到 MKV，在 MKV 元数据中保存插件使用的 CID/GCID，并在详情页提供内封字幕管理入口，支持逐段或整组转换为 MKV、搜索迅雷字幕、下载后自动转临时 SRT 并写入 MKV，最终不再依赖外挂字幕文件。",
+    "owner":  "yexi-by",
+    "category":  "Metadata",
+    "repositoryUrl":  "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools",
+    "repositoryName":  "yexi-by/jellyfin-plugin-subtitles-tools",
+    "versions":  [
+                     {
+                         "version":  "0.7.0.0",
+                         "changelog":  "插件视频纳管链路与 video-transcoding-tool 对齐，新增安卓硬解高风险识别、Intel QSV 兼容修复重编码、QSV 设备配置与前端状态展示。",
+                         "targetAbi":  "10.11.0.0",
+                         "sourceUrl":  "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.0.0/Jellyfin.Plugin.SubtitlesTools_0.7.0.0.zip",
+                         "checksum":  "B0B34809FB13E4A3E80F5EB51E1D79AD",
+                         "timestamp":  "2026-03-21T21:31:33Z"
+                     }
+                 ]
+}

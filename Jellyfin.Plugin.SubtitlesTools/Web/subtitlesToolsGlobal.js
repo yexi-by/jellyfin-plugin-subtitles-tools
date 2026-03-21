@@ -579,6 +579,18 @@
                 }
             }
 
+            if (typeof result.RiskVerdict === 'string' && result.RiskVerdict) {
+                part.RiskVerdict = result.RiskVerdict;
+            }
+
+            if (typeof result.Pipeline === 'string') {
+                part.Pipeline = result.Pipeline;
+            }
+
+            if (typeof result.NeedsCompatibilityRepair === 'boolean') {
+                part.NeedsCompatibilityRepair = result.NeedsCompatibilityRepair;
+            }
+
             if (result.EmbeddedSubtitle) {
                 const nonPluginTracks = Array.isArray(part.EmbeddedSubtitles)
                     ? part.EmbeddedSubtitles.filter(track => !track.IsPluginManaged)
@@ -643,6 +655,19 @@
                     return false;
                 }
 
+                if (item.RiskVerdict && part.RiskVerdict !== item.RiskVerdict) {
+                    return false;
+                }
+
+                if (typeof item.NeedsCompatibilityRepair === 'boolean'
+                    && part.NeedsCompatibilityRepair !== item.NeedsCompatibilityRepair) {
+                    return false;
+                }
+
+                if (typeof item.Pipeline === 'string' && item.Pipeline !== part.Pipeline) {
+                    return false;
+                }
+
                 if (item.Status === 'embedded' && item.EmbeddedSubtitle) {
                     return Array.isArray(part.EmbeddedSubtitles)
                         && part.EmbeddedSubtitles.some(track =>
@@ -675,6 +700,19 @@
             }
 
             if (expectedResult.Container && part.Container !== expectedResult.Container) {
+                return false;
+            }
+
+            if (expectedResult.RiskVerdict && part.RiskVerdict !== expectedResult.RiskVerdict) {
+                return false;
+            }
+
+            if (typeof expectedResult.NeedsCompatibilityRepair === 'boolean'
+                && part.NeedsCompatibilityRepair !== expectedResult.NeedsCompatibilityRepair) {
+                return false;
+            }
+
+            if (typeof expectedResult.Pipeline === 'string' && expectedResult.Pipeline !== part.Pipeline) {
                 return false;
             }
 
@@ -804,6 +842,18 @@
         return part.ReadIdentityFromMetadata ? '\u5df2\u7eb3\u7ba1\uff08\u8bfb\u53d6 MKV \u5143\u6570\u636e\uff09' : '\u5df2\u7eb3\u7ba1';
     }
 
+    function getCompatibilityStatusText(part) {
+        if (!part || !part.RiskVerdict) {
+            return '未评估';
+        }
+
+        if (part.NeedsCompatibilityRepair === true) {
+            return `${part.RiskVerdict}（需要修复）`;
+        }
+
+        return part.RiskVerdict;
+    }
+
     function renderCurrentPart(part) {
         if (!part) {
             return '<div class="subtitles-tools-summary-item">\u5f53\u524d\u6ca1\u6709\u53ef\u5c55\u793a\u7684\u5206\u6bb5\u4fe1\u606f\u3002</div>';
@@ -817,6 +867,8 @@
                 <div class="subtitles-tools-card-meta">
                     <span>\u5bb9\u5668\uff1a${escapeHtml(part.Container || 'unknown')}</span>
                     <span>${managedText}</span>
+                    <span>\u517c\u5bb9\u6027\uff1a${escapeHtml(getCompatibilityStatusText(part))}</span>
+                    <span>\u6d41\u6c34\u7ebf\uff1a${escapeHtml(part.Pipeline || '未写入')}</span>
                     <span>\u8def\u5f84\uff1a${escapeHtml(part.MediaPath)}</span>
                 </div>
             </div>
@@ -872,6 +924,7 @@
                                         <span>${escapeHtml(part.FileName)}</span>
                                         <span>${escapeHtml(part.Container || 'unknown')}</span>
                                         <span>${managedText}</span>
+                                        <span>${escapeHtml(getCompatibilityStatusText(part))}</span>
                                     </div>
                                 </button>
                             `;
@@ -882,7 +935,7 @@
                             <h3>\u5f53\u524d\u5206\u6bb5</h3>
                             ${renderCurrentPart(activePart)}
                             <div class="subtitles-tools-note">
-                                \u63d2\u4ef6\u73b0\u5728\u53ea\u8ba4\u89c6\u9891\u81ea\u8eab\u7684 MKV \u5143\u6570\u636e\u6765\u5224\u65ad\u662f\u5426\u5df2\u7eb3\u7ba1\u3002\u9996\u6b21\u5bf9\u5f53\u524d\u5206\u6bb5\u7684\u641c\u7d22\u3001\u8f6c\u6362\u6216\u5185\u5c01\u64cd\u4f5c\uff0c\u90fd\u4f1a\u5148\u786e\u4fdd\u8be5\u5206\u6bb5\u5df2\u7ecf\u7eb3\u7ba1\uff1b\u4e0b\u8f7d\u5b57\u5e55\u540e\u4f1a\u5148\u8f6c\u6210\u4e34\u65f6 UTF-8 SRT\uff0c\u518d\u5199\u5165\u5f53\u524d\u5206\u6bb5\u7684 MKV \u5bb9\u5668\uff0c\u6210\u529f\u540e\u81ea\u52a8\u5220\u9664\u4e34\u65f6 SRT\u3002
+                                \u63d2\u4ef6\u73b0\u5728\u4f1a\u5148\u786e\u4fdd\u89c6\u9891\u5df2\u7ecf\u7eb3\u7ba1\uff0c\u5e76\u4e14\u5bf9\u547d\u4e2d\u9ad8\u98ce\u9669\u786c\u89e3\u89c4\u5219\u7684\u8001\u89c6\u9891\u5148\u505a Intel QSV \u517c\u5bb9\u4fee\u590d\u3002\u5728\u6b64\u4e4b\u540e\uff0c\u624b\u52a8\u641c\u7d22\u3001\u4e0b\u8f7d\u6216\u4e00\u952e\u5168\u6bb5\u5185\u5c01\u624d\u4f1a\u7ee7\u7eed\u6267\u884c\uff1b\u5b57\u5e55\u4ecd\u7136\u4f1a\u5148\u8f6c\u6210\u4e34\u65f6 UTF-8 SRT\uff0c\u518d\u5199\u5165 MKV\uff0c\u6210\u529f\u540e\u81ea\u52a8\u5220\u9664\u4e34\u65f6 SRT\u3002
                             </div>
                         </div>
                         <div class="subtitles-tools-section">

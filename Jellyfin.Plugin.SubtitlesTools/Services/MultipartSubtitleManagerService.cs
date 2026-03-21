@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -18,7 +18,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 负责“分段字幕管理页”所需的媒体识别、纳管、MKV 转换、字幕搜索、SRT 归一化、内封和删除流程。
+/// 负责“分段字幕管理页”所需的媒体识别、纳管、兼容修复、字幕搜索、SRT 归一化、内封和删除流程。
 /// 当前版本只认 MKV 元数据，不再依赖任何插件侧哈希归档。
 /// </summary>
 public sealed class MultipartSubtitleManagerService
@@ -62,7 +62,7 @@ public sealed class MultipartSubtitleManagerService
     }
 
     /// <summary>
-    /// 获取媒体项的分段结构、当前容器状态与内封字幕流。
+    /// 获取媒体项的分段结构、当前容器状态、兼容风险与已内封字幕流。
     /// </summary>
     public async Task<ManagedItemPartsResponseDto> GetItemPartsAsync(Guid itemId, CancellationToken cancellationToken)
     {
@@ -85,7 +85,7 @@ public sealed class MultipartSubtitleManagerService
     }
 
     /// <summary>
-    /// 为指定分段先纳管，再调用 Python 服务搜索字幕。
+    /// 为指定分段先确保“已纳管且已兼容”，再调用 Python 服务搜索字幕。
     /// </summary>
     public async Task<ManagedPartSearchResponseDto> SearchPartAsync(Guid itemId, string partId, CancellationToken cancellationToken)
     {
@@ -137,12 +137,15 @@ public sealed class MultipartSubtitleManagerService
             MediaPath = managedFile.FullName,
             Container = NormalizeContainer(managedFile.Extension),
             IsManaged = true,
+            RiskVerdict = management.RiskVerdict,
+            Pipeline = management.Pipeline,
+            NeedsCompatibilityRepair = management.NeedsCompatibilityRepair,
             Items = items
         };
     }
 
     /// <summary>
-    /// 手动把当前分段纳管为 MKV。
+    /// 手动把当前分段纳管并修复到兼容安卓硬解的 MKV。
     /// </summary>
     public async Task<ManagedPartConvertResponseDto> ConvertPartAsync(Guid itemId, string partId, CancellationToken cancellationToken)
     {
@@ -167,12 +170,15 @@ public sealed class MultipartSubtitleManagerService
             MediaPath = result.Identity.MediaPath,
             Container = result.Identity.Container,
             IsManaged = true,
-            UsedTranscodeFallback = result.UsedTranscodeFallback
+            RiskVerdict = result.RiskVerdict,
+            Pipeline = result.Pipeline,
+            NeedsCompatibilityRepair = result.NeedsCompatibilityRepair,
+            UsedCompatibilityRepairReencode = result.UsedCompatibilityRepairReencode
         };
     }
 
     /// <summary>
-    /// 一键把整组分段纳管为 MKV。
+    /// 一键把整组分段纳管并修复到兼容安卓硬解的 MKV。
     /// </summary>
     public async Task<ManagedBatchOperationResponseDto> ConvertGroupAsync(
         Guid itemId,
@@ -205,7 +211,11 @@ public sealed class MultipartSubtitleManagerService
                     Message = result.Message,
                     MediaPath = result.Identity.MediaPath,
                     Container = result.Identity.Container,
-                    IsManaged = true
+                    IsManaged = true,
+                    RiskVerdict = result.RiskVerdict,
+                    Pipeline = result.Pipeline,
+                    NeedsCompatibilityRepair = result.NeedsCompatibilityRepair,
+                    UsedCompatibilityRepairReencode = result.UsedCompatibilityRepairReencode
                 });
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or FfmpegExecutionException)
@@ -234,6 +244,7 @@ public sealed class MultipartSubtitleManagerService
 
     /// <summary>
     /// 下载指定候选字幕，转成临时 SRT 后写入当前分段的 MKV。
+    /// 执行内封前会先确保当前分段已经完成纳管与兼容修复。
     /// </summary>
     public async Task<ManagedPartDownloadResponseDto> DownloadPartAsync(
         Guid itemId,
@@ -266,12 +277,17 @@ public sealed class MultipartSubtitleManagerService
             MediaPath = embedResult.MediaPath,
             Container = embedResult.Container,
             IsManaged = true,
+            RiskVerdict = embedResult.RiskVerdict,
+            Pipeline = embedResult.Pipeline,
+            NeedsCompatibilityRepair = embedResult.NeedsCompatibilityRepair,
+            UsedCompatibilityRepairReencode = embedResult.UsedCompatibilityRepairReencode,
             EmbeddedSubtitle = embedResult.EmbeddedSubtitle
         };
     }
 
     /// <summary>
     /// 删除当前分段中的一条插件内封字幕流。
+    /// 删除前会先确保当前分段已经纳管并可被当前插件识别。
     /// </summary>
     public async Task<ManagedDeleteEmbeddedSubtitleResponseDto> DeleteEmbeddedSubtitleAsync(
         Guid itemId,
@@ -304,6 +320,7 @@ public sealed class MultipartSubtitleManagerService
 
     /// <summary>
     /// 为所有分段分别搜索并内封第一名字幕候选。
+    /// 每个分段都会先完成纳管和兼容修复，再进入字幕搜索与内封。
     /// </summary>
     public async Task<ManagedBatchOperationResponseDto> DownloadBestAsync(
         Guid itemId,
@@ -352,7 +369,11 @@ public sealed class MultipartSubtitleManagerService
                         Message = "未找到可下载的字幕候选。",
                         MediaPath = managedFile.FullName,
                         Container = NormalizeContainer(managedFile.Extension),
-                        IsManaged = true
+                        IsManaged = true,
+                        RiskVerdict = management.RiskVerdict,
+                        Pipeline = management.Pipeline,
+                        NeedsCompatibilityRepair = management.NeedsCompatibilityRepair,
+                        UsedCompatibilityRepairReencode = management.UsedCompatibilityRepairReencode
                     });
                     continue;
                 }
@@ -380,6 +401,10 @@ public sealed class MultipartSubtitleManagerService
                     MediaPath = embedResult.MediaPath,
                     Container = embedResult.Container,
                     IsManaged = true,
+                    RiskVerdict = embedResult.RiskVerdict,
+                    Pipeline = embedResult.Pipeline,
+                    NeedsCompatibilityRepair = embedResult.NeedsCompatibilityRepair,
+                    UsedCompatibilityRepairReencode = embedResult.UsedCompatibilityRepairReencode,
                     EmbeddedSubtitle = embedResult.EmbeddedSubtitle
                 });
             }
@@ -394,7 +419,11 @@ public sealed class MultipartSubtitleManagerService
                     Message = ex.Message,
                     MediaPath = management?.Identity.MediaPath ?? part.MediaFile.FullName,
                     Container = management?.Identity.Container ?? NormalizeContainer(part.MediaFile.Extension),
-                    IsManaged = management is not null
+                    IsManaged = management is not null,
+                    RiskVerdict = management?.RiskVerdict ?? string.Empty,
+                    Pipeline = management?.Pipeline ?? string.Empty,
+                    NeedsCompatibilityRepair = management?.NeedsCompatibilityRepair ?? false,
+                    UsedCompatibilityRepairReencode = management?.UsedCompatibilityRepairReencode ?? false
                 });
             }
         }
@@ -430,7 +459,7 @@ public sealed class MultipartSubtitleManagerService
 
     private async Task<ManagedMediaPartDto> BuildManagedPartAsync(MultipartMediaPart part, string currentPartId, CancellationToken cancellationToken)
     {
-        var identity = await _mkvMetadataIdentityService.TryGetIdentityAsync(part.MediaFile.FullName, cancellationToken).ConfigureAwait(false);
+        var inspection = await _mkvMetadataIdentityService.InspectAsync(part.MediaFile.FullName, cancellationToken).ConfigureAwait(false);
         var embeddedSubtitles = await _embeddedSubtitleService.GetEmbeddedSubtitlesAsync(part.MediaFile, cancellationToken).ConfigureAwait(false);
         return new ManagedMediaPartDto
         {
@@ -442,9 +471,12 @@ public sealed class MultipartSubtitleManagerService
             PartKind = part.PartKind,
             PartNumber = part.PartNumber,
             IsCurrent = string.Equals(part.Id, currentPartId, StringComparison.Ordinal),
-            Container = NormalizeContainer(part.MediaFile.Extension),
-            IsManaged = identity is not null,
-            ReadIdentityFromMetadata = identity?.ReadFromMetadata ?? false,
+            Container = inspection.Container,
+            IsManaged = inspection.Identity is not null,
+            ReadIdentityFromMetadata = inspection.Identity?.ReadFromMetadata ?? false,
+            RiskVerdict = inspection.RiskVerdict,
+            Pipeline = inspection.Pipeline,
+            NeedsCompatibilityRepair = inspection.NeedsCompatibilityRepair,
             EmbeddedSubtitles = embeddedSubtitles
         };
     }
@@ -488,6 +520,10 @@ public sealed class MultipartSubtitleManagerService
             {
                 MediaPath = managedFile.FullName,
                 Container = "mkv",
+                RiskVerdict = management.RiskVerdict,
+                Pipeline = management.Pipeline,
+                NeedsCompatibilityRepair = management.NeedsCompatibilityRepair,
+                UsedCompatibilityRepairReencode = management.UsedCompatibilityRepairReencode,
                 EmbeddedSubtitle = embeddedSubtitle
             };
         }
@@ -643,6 +679,10 @@ public sealed class MultipartSubtitleManagerService
     {
         public string MediaPath { get; set; } = string.Empty;
         public string Container { get; set; } = string.Empty;
+        public string RiskVerdict { get; set; } = string.Empty;
+        public string Pipeline { get; set; } = string.Empty;
+        public bool NeedsCompatibilityRepair { get; set; }
+        public bool UsedCompatibilityRepairReencode { get; set; }
         public ManagedEmbeddedSubtitleDto EmbeddedSubtitle { get; set; } = new();
     }
 }

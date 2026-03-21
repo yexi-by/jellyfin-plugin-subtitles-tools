@@ -15,10 +15,10 @@
                         当前版本面向 Jellyfin 10.11.6 及更新的 10.11 系列，只处理本地 Movie 和 Episode 文件。
                     </div>
                     <div class="fieldDescription">
-                        插件现在只认视频自身的 MKV 元数据来判断是否已纳管，并统一走“确保纳管 -> 迅雷搜字幕 -> 转 UTF-8 SRT -> 软字幕内封到 MKV”的流程。
+                        插件现在只认视频自身的 MKV 元数据来判断是否已纳管，并统一走“确保纳管与安卓硬解兼容 -> 迅雷搜字幕 -> 转 UTF-8 SRT -> 软字幕内封到 MKV”的流程。
                     </div>
                     <div class="fieldDescription">
-                        历史影片可通过 Jellyfin 计划任务“<strong>一键算 CID/GCID 并转换为 MKV</strong>”统一处理；任务会扫描整个媒体库，但只处理未纳管影片。
+                        历史影片可通过 Jellyfin 计划任务“<strong>一键算 CID/GCID 并转换为 MKV（含安卓硬解兼容修复）</strong>”统一处理；任务会扫描整个媒体库，处理未纳管影片以及仍命中高风险硬解规则的旧视频。
                     </div>
                     <div class="fieldDescription">
                         Python 服务端项目：
@@ -39,10 +39,10 @@
                 <div class="checkboxContainer checkboxContainer-withDescription">
                     <label class="emby-checkbox-label">
                         <input is="emby-checkbox" id="enableAutoVideoConvertToMkv" type="checkbox" />
-                        <span>新视频入库后自动纳管为 MKV</span>
+                        <span>新视频入库后自动纳管并修复安卓硬解兼容</span>
                     </label>
                     <div class="fieldDescription">
-                        默认开启。新入库文件若已是 MKV，则会自动补算 CID/GCID 并写入 MKV 元数据；若不是 MKV，则会先计算 CID/GCID，再转换为 MKV 并写入元数据。
+                        默认开启。新入库文件若已是 MKV，则会自动补算 CID/GCID 并写入 MKV 元数据；若命中高风险老编码或老容器，则会直接走 Intel QSV 重编码修复为 H.264 + AAC + MKV。
                     </div>
                 </div>
 
@@ -57,6 +57,13 @@
                     <input is="emby-input" id="ffmpegExecutablePath" type="text" label="FFmpeg 可执行文件路径（可选）" placeholder="/usr/lib/jellyfin-ffmpeg/ffmpeg" />
                     <div class="fieldDescription">
                         留空时会优先自动探测 Jellyfin 自带 FFmpeg，再回退到系统 PATH。
+                    </div>
+                </div>
+
+                <div class="inputContainer">
+                    <input is="emby-input" id="qsvRenderDevicePath" type="text" label="Intel QSV 渲染设备路径" placeholder="/dev/dri/renderD128" />
+                    <div class="fieldDescription">
+                        默认使用 <code>/dev/dri/renderD128</code>。插件只支持 Intel QSV，不提供 VAAPI 或 CPU 兜底。
                     </div>
                 </div>
 

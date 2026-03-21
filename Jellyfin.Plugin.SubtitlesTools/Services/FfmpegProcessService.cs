@@ -16,7 +16,7 @@ namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
 /// 统一封装 FFmpeg 与 FFprobe 的定位、执行和探测逻辑。
-/// 除字幕流探测外，本服务还负责读取 MKV 容器中的自定义元数据标签。
+/// 除字幕流探测外，本服务还负责读取 MKV 容器标签、视频流摘要以及编码器可用性。
 /// </summary>
 public sealed class FfmpegProcessService
 {
@@ -72,6 +72,56 @@ public sealed class FfmpegProcessService
     }
 
     /// <summary>
+    /// 读取当前媒体的容器信息以及视频、音频、字幕流摘要。
+    /// 该方法只返回插件做纳管和硬解风险判定所需的最小字段。
+    /// </summary>
+    public async Task<ProbedMediaInfo> ProbeMediaAsync(
+        string mediaPath,
+        CancellationToken cancellationToken,
+        string? traceId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mediaPath);
+
+        var result = await RunFfprobeAsync(
+            [
+                "-v",
+                "error",
+                "-show_entries",
+                "format=format_name,format_long_name:stream=index,codec_type,codec_name,codec_long_name,profile,codec_tag_string,width,height,pix_fmt",
+                "-show_format",
+                "-show_streams",
+                "-print_format",
+                "json",
+                mediaPath
+            ],
+            traceId,
+            "probe_media",
+            cancellationToken).ConfigureAwait(false);
+
+        var payload = JsonSerializer.Deserialize<FfprobeMediaPayload>(result.StandardOutput, JsonSerializerOptions);
+        return new ProbedMediaInfo
+        {
+            FormatName = payload?.Format?.FormatName?.Trim().ToLowerInvariant() ?? string.Empty,
+            FormatLongName = payload?.Format?.FormatLongName?.Trim() ?? string.Empty,
+            Streams = payload?.Streams?
+                .OrderBy(stream => stream.Index)
+                .Select(stream => new ProbedMediaStream
+                {
+                    Index = stream.Index,
+                    CodecType = stream.CodecType?.Trim().ToLowerInvariant() ?? string.Empty,
+                    CodecName = stream.CodecName?.Trim().ToLowerInvariant() ?? string.Empty,
+                    CodecLongName = stream.CodecLongName?.Trim() ?? string.Empty,
+                    Profile = stream.Profile?.Trim() ?? string.Empty,
+                    CodecTagString = stream.CodecTagString?.Trim() ?? string.Empty,
+                    Width = stream.Width,
+                    Height = stream.Height,
+                    PixelFormat = stream.PixelFormat?.Trim().ToLowerInvariant() ?? string.Empty
+                })
+                .ToList() ?? []
+        };
+    }
+
+    /// <summary>
     /// 读取 MKV 容器的顶层标签。
     /// 这里只把标签当作插件内部的受管身份来源，不对外暴露通用元数据能力。
     /// </summary>
@@ -116,6 +166,28 @@ public sealed class FfmpegProcessService
     public (string FfmpegPath, string FfprobePath) ValidateExecutables()
     {
         return (ResolveExecutablePath(isProbe: false), ResolveExecutablePath(isProbe: true));
+    }
+
+    /// <summary>
+    /// 判断当前 FFmpeg 是否编入了指定编码器。
+    /// 这里只做“是否存在编码器名字”的轻量检测，不直接替代真实转码过程。
+    /// </summary>
+    public async Task<bool> SupportsEncoderAsync(
+        string encoderName,
+        CancellationToken cancellationToken,
+        string? traceId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(encoderName);
+
+        var result = await RunFfmpegAsync(
+            ["-hide_banner", "-encoders"],
+            traceId,
+            "list_ffmpeg_encoders",
+            cancellationToken).ConfigureAwait(false);
+
+        return result.StandardOutput
+            .Split([Environment.NewLine], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(line => line.Contains(encoderName, StringComparison.OrdinalIgnoreCase));
     }
 
     private Task<FfmpegCommandResult> RunFfprobeAsync(
@@ -358,10 +430,58 @@ public sealed class FfmpegProcessService
         public FfprobeFormat? Format { get; set; }
     }
 
+    private sealed class FfprobeMediaPayload
+    {
+        [JsonPropertyName("streams")]
+        public List<FfprobeMediaStream>? Streams { get; set; }
+
+        [JsonPropertyName("format")]
+        public FfprobeMediaFormat? Format { get; set; }
+    }
+
     private sealed class FfprobeFormat
     {
         [JsonPropertyName("tags")]
         public Dictionary<string, string>? Tags { get; set; }
+    }
+
+    private sealed class FfprobeMediaFormat
+    {
+        [JsonPropertyName("format_name")]
+        public string? FormatName { get; set; }
+
+        [JsonPropertyName("format_long_name")]
+        public string? FormatLongName { get; set; }
+    }
+
+    private sealed class FfprobeMediaStream
+    {
+        [JsonPropertyName("index")]
+        public int Index { get; set; }
+
+        [JsonPropertyName("codec_type")]
+        public string? CodecType { get; set; }
+
+        [JsonPropertyName("codec_name")]
+        public string? CodecName { get; set; }
+
+        [JsonPropertyName("codec_long_name")]
+        public string? CodecLongName { get; set; }
+
+        [JsonPropertyName("profile")]
+        public string? Profile { get; set; }
+
+        [JsonPropertyName("codec_tag_string")]
+        public string? CodecTagString { get; set; }
+
+        [JsonPropertyName("width")]
+        public int? Width { get; set; }
+
+        [JsonPropertyName("height")]
+        public int? Height { get; set; }
+
+        [JsonPropertyName("pix_fmt")]
+        public string? PixelFormat { get; set; }
     }
 
     private sealed class FfprobeTags
@@ -397,6 +517,36 @@ public sealed class ProbedSubtitleTrack
     public string Codec { get; set; } = string.Empty;
     public string Language { get; set; } = "und";
     public string Title { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 表示 ffprobe 返回的媒体探测摘要。
+/// </summary>
+public sealed class ProbedMediaInfo
+{
+    public string FormatName { get; set; } = string.Empty;
+    public string FormatLongName { get; set; } = string.Empty;
+    public List<ProbedMediaStream> Streams { get; set; } = [];
+}
+
+/// <summary>
+/// 表示 ffprobe 返回的一条媒体流摘要。
+/// </summary>
+[SuppressMessage(
+    "Naming",
+    "CA1711:Identifiers should not have incorrect suffix",
+    Justification = "该类型表示 ffprobe 返回的媒体流摘要，而不是 System.IO.Stream。")]
+public sealed class ProbedMediaStream
+{
+    public int Index { get; set; }
+    public string CodecType { get; set; } = string.Empty;
+    public string CodecName { get; set; } = string.Empty;
+    public string CodecLongName { get; set; } = string.Empty;
+    public string Profile { get; set; } = string.Empty;
+    public string CodecTagString { get; set; } = string.Empty;
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public string PixelFormat { get; set; } = string.Empty;
 }
 
 /// <summary>

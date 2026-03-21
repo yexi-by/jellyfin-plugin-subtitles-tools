@@ -15,8 +15,8 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 扫描现有媒体库，把尚未被插件纳管的本地视频统一纳管为受管 MKV。
-/// 当前版本不再依赖插件侧哈希归档，而是只认 MKV 自定义元数据。
+/// 扫描现有媒体库，把尚未被插件纳管或仍需兼容修复的本地视频统一处理为受管 MKV。
+/// 当前版本不再依赖插件侧哈希归档，而是只认 MKV 自定义元数据和视频自身的兼容风险。
 /// </summary>
 public sealed class VideoHashBackfillService
 {
@@ -44,51 +44,46 @@ public sealed class VideoHashBackfillService
     }
 
     /// <summary>
-    /// 扫描 Jellyfin 已入库的本地电影和剧集，把尚未纳管的文件统一纳管为 MKV。
+    /// 扫描 Jellyfin 已入库的本地电影和剧集，把未纳管文件统一纳管为 MKV，
+    /// 并继续修复那些“已纳管但仍命中高风险硬解规则”的旧视频。
     /// </summary>
     public async Task ManageUnprocessedVideosAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(progress);
 
         var candidates = EnumerateEligibleItems().ToArray();
-        var unmanagedItems = new List<EligibleMediaItem>(candidates.Length);
+        var pendingItems = new List<EligibleMediaItem>(candidates.Length);
 
         foreach (var candidate in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!string.Equals(Path.GetExtension(candidate.MediaPath), ".mkv", StringComparison.OrdinalIgnoreCase))
-            {
-                unmanagedItems.Add(candidate);
-                continue;
-            }
-
-            var identity = await _mkvMetadataIdentityService
-                .TryGetIdentityAsync(candidate.MediaPath, cancellationToken)
+            var inspection = await _mkvMetadataIdentityService
+                .InspectAsync(candidate.MediaPath, cancellationToken)
                 .ConfigureAwait(false);
-            if (identity is null)
+            if (inspection.Identity is null || inspection.NeedsCompatibilityRepair)
             {
-                unmanagedItems.Add(candidate);
+                pendingItems.Add(candidate);
             }
         }
 
-        if (unmanagedItems.Count == 0)
+        if (pendingItems.Count == 0)
         {
             progress.Report(100);
-            _logger.LogInformation("manual_manage_backfill_complete candidates={CandidateCount} unmanaged=0", candidates.Length);
+            _logger.LogInformation("manual_manage_backfill_complete candidates={CandidateCount} pending=0", candidates.Length);
             return;
         }
 
         var concurrency = GetNormalizedConcurrency();
         _logger.LogInformation(
-            "manual_manage_backfill_start candidates={CandidateCount} unmanaged={UnmanagedCount} concurrency={Concurrency}",
+            "manual_manage_backfill_start candidates={CandidateCount} pending={PendingCount} concurrency={Concurrency}",
             candidates.Length,
-            unmanagedItems.Count,
+            pendingItems.Count,
             concurrency);
 
         var completedCount = 0;
         await Parallel.ForEachAsync(
-            unmanagedItems,
+            pendingItems,
             new ParallelOptions
             {
                 MaxDegreeOfParallelism = concurrency,
@@ -118,14 +113,14 @@ public sealed class VideoHashBackfillService
                 finally
                 {
                     var current = Interlocked.Increment(ref completedCount);
-                    progress.Report(current * 100d / unmanagedItems.Count);
+                    progress.Report(current * 100d / pendingItems.Count);
                 }
             }).ConfigureAwait(false);
 
         _logger.LogInformation(
-            "manual_manage_backfill_complete candidates={CandidateCount} unmanaged={UnmanagedCount} concurrency={Concurrency}",
+            "manual_manage_backfill_complete candidates={CandidateCount} pending={PendingCount} concurrency={Concurrency}",
             candidates.Length,
-            unmanagedItems.Count,
+            pendingItems.Count,
             concurrency);
     }
 
