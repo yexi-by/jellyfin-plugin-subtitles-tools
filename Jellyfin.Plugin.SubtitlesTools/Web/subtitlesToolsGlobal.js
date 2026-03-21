@@ -572,7 +572,12 @@
                 part.Container = result.Container;
             }
 
-            part.HasOriginalHash = true;
+            if (result.IsManaged === true) {
+                part.IsManaged = true;
+                if (part.Container === 'mkv') {
+                    part.ReadIdentityFromMetadata = true;
+                }
+            }
 
             if (result.EmbeddedSubtitle) {
                 const nonPluginTracks = Array.isArray(part.EmbeddedSubtitles)
@@ -600,7 +605,10 @@
         }
 
         items.forEach(item => {
-            if (item.Status === 'converted' || item.Status === 'embedded') {
+            const shouldApply = item.IsManaged === true
+                || item.Status === 'converted'
+                || item.Status === 'embedded';
+            if (shouldApply) {
                 applyOperationResultToPart(item.PartId, item);
             }
         });
@@ -612,7 +620,7 @@
                 return false;
             }
 
-            const successfulItems = items.filter(item => item.Status === 'converted' || item.Status === 'embedded');
+            const successfulItems = items.filter(item => item.IsManaged === true || item.Status === 'converted' || item.Status === 'embedded');
             if (successfulItems.length === 0) {
                 return true;
             }
@@ -620,6 +628,10 @@
             return successfulItems.every(item => {
                 const part = payload.Parts.find(payloadPart => payloadPart.Id === item.PartId);
                 if (!part) {
+                    return false;
+                }
+
+                if (item.IsManaged === true && part.IsManaged !== true) {
                     return false;
                 }
 
@@ -651,6 +663,10 @@
 
             const part = payload.Parts.find(payloadPart => payloadPart.Id === partId);
             if (!part) {
+                return false;
+            }
+
+            if (expectedResult.IsManaged === true && part.IsManaged !== true) {
                 return false;
             }
 
@@ -780,18 +796,28 @@
         `;
     }
 
+    function getManagedStatusText(part) {
+        if (!part || part.IsManaged !== true) {
+            return '\u672a\u7eb3\u7ba1';
+        }
+
+        return part.ReadIdentityFromMetadata ? '\u5df2\u7eb3\u7ba1\uff08\u8bfb\u53d6 MKV \u5143\u6570\u636e\uff09' : '\u5df2\u7eb3\u7ba1';
+    }
+
     function renderCurrentPart(part) {
         if (!part) {
-            return '<div class="subtitles-tools-summary-item">未找到当前分段。</div>';
+            return '<div class="subtitles-tools-summary-item">\u5f53\u524d\u6ca1\u6709\u53ef\u5c55\u793a\u7684\u5206\u6bb5\u4fe1\u606f\u3002</div>';
         }
+
+        const managedText = getManagedStatusText(part);
 
         return `
             <div class="subtitles-tools-card">
-                <div class="subtitles-tools-card-title">${escapeHtml(part.Label)} · ${escapeHtml(part.FileName)}</div>
+                <div class="subtitles-tools-card-title">${escapeHtml(part.Label)} \u00b7 ${escapeHtml(part.FileName)}</div>
                 <div class="subtitles-tools-card-meta">
-                    <span>容器：${escapeHtml(part.Container || 'unknown')}</span>
-                    <span>${part.HasOriginalHash ? '原始 CID/GCID 已归档' : '原始 CID/GCID 尚未归档'}</span>
-                    <span>路径：${escapeHtml(part.MediaPath)}</span>
+                    <span>\u5bb9\u5668\uff1a${escapeHtml(part.Container || 'unknown')}</span>
+                    <span>${managedText}</span>
+                    <span>\u8def\u5f84\uff1a${escapeHtml(part.MediaPath)}</span>
                 </div>
             </div>
         `;
@@ -806,7 +832,9 @@
 
         const activePart = getActivePart();
         const embeddedSubtitlesHtml = activePart ? renderEmbeddedSubtitles(activePart) : '';
-        const searchResultsHtml = activePart ? renderResults(activePart.Id) : '<div class="subtitles-tools-summary-item">未找到当前分段。</div>';
+        const searchResultsHtml = activePart
+            ? renderResults(activePart.Id)
+            : '<div class="subtitles-tools-summary-item">\u5f53\u524d\u6ca1\u6709\u53ef\u5c55\u793a\u7684\u5206\u6bb5\u3002</div>';
 
         overlay.innerHTML = `
             <div class="subtitles-tools-panel">
@@ -814,52 +842,55 @@
                     <div>
                         <h2 class="subtitles-tools-title">${escapeHtml(state.itemData.Name)}</h2>
                         <div class="subtitles-tools-subtitle">
-                            ${escapeHtml(state.itemData.ItemType)} · ${state.itemData.IsMultipart ? '多分段媒体' : '单文件媒体'}
+                            ${escapeHtml(state.itemData.ItemType)} \u00b7 ${state.itemData.IsMultipart ? '\u591a\u5206\u6bb5\u5a92\u4f53' : '\u5355\u6587\u4ef6\u5a92\u4f53'}
                         </div>
                     </div>
-                    <button class="subtitles-tools-close" type="button" data-action="close">×</button>
+                    <button class="subtitles-tools-close" type="button" data-action="close">\u00d7</button>
                 </div>
                 <div class="subtitles-tools-toolbar">
-                    <button class="subtitles-tools-button is-secondary" type="button" data-action="refresh">刷新状态</button>
-                    <button class="subtitles-tools-button" type="button" data-action="search-part">搜索当前分段</button>
-                    <button class="subtitles-tools-button" type="button" data-action="convert-part">转换当前分段为 MKV</button>
-                    <button class="subtitles-tools-button" type="button" data-action="convert-group">一键整组转换为 MKV</button>
-                    <button class="subtitles-tools-button" type="button" data-action="download-best">一键整组最佳匹配并内封</button>
+                    <button class="subtitles-tools-button is-secondary" type="button" data-action="refresh">\u5237\u65b0\u72b6\u6001</button>
+                    <button class="subtitles-tools-button" type="button" data-action="search-part">\u641c\u7d22\u5f53\u524d\u5206\u6bb5</button>
+                    <button class="subtitles-tools-button" type="button" data-action="convert-part">\u8f6c\u6362\u5f53\u524d\u5206\u6bb5\u4e3a MKV</button>
+                    <button class="subtitles-tools-button" type="button" data-action="convert-group">\u4e00\u952e\u6574\u7ec4\u8f6c\u6362\u4e3a MKV</button>
+                    <button class="subtitles-tools-button" type="button" data-action="download-best">\u4e00\u952e\u6574\u7ec4\u6700\u4f73\u5339\u914d\u5e76\u5185\u5c01</button>
                 </div>
                 <div class="subtitles-tools-toolbar">
                     <div class="subtitles-tools-status"></div>
                 </div>
                 <div class="subtitles-tools-body">
                     <div class="subtitles-tools-parts">
-                        ${state.itemData.Parts.map(part => `
-                            <button
-                                class="subtitles-tools-part-button ${part.Id === state.activePartId ? 'is-active' : ''}"
-                                type="button"
-                                data-action="select-part"
-                                data-part-id="${escapeHtml(part.Id)}">
-                                <div>${escapeHtml(part.Label)}</div>
-                                <div class="subtitles-tools-part-meta">
-                                    <span>${escapeHtml(part.FileName)}</span>
-                                    <span>${escapeHtml(part.Container || 'unknown')}</span>
-                                    <span>${part.HasOriginalHash ? '已归档旧哈希' : '未归档旧哈希'}</span>
-                                </div>
-                            </button>
-                        `).join('')}
+                        ${state.itemData.Parts.map(part => {
+                            const managedText = getManagedStatusText(part);
+                            return `
+                                <button
+                                    class="subtitles-tools-part-button ${part.Id === state.activePartId ? 'is-active' : ''}"
+                                    type="button"
+                                    data-action="select-part"
+                                    data-part-id="${escapeHtml(part.Id)}">
+                                    <div>${escapeHtml(part.Label)}</div>
+                                    <div class="subtitles-tools-part-meta">
+                                        <span>${escapeHtml(part.FileName)}</span>
+                                        <span>${escapeHtml(part.Container || 'unknown')}</span>
+                                        <span>${managedText}</span>
+                                    </div>
+                                </button>
+                            `;
+                        }).join('')}
                     </div>
                     <div class="subtitles-tools-main">
                         <div class="subtitles-tools-section">
-                            <h3>当前分段</h3>
+                            <h3>\u5f53\u524d\u5206\u6bb5</h3>
                             ${renderCurrentPart(activePart)}
                             <div class="subtitles-tools-note">
-                                插件现在不再保留外挂字幕文件。下载字幕后会先转成临时 UTF-8 SRT，再写入当前分段的 MKV 容器；成功后会自动删除临时 SRT。
+                                \u63d2\u4ef6\u73b0\u5728\u53ea\u8ba4\u89c6\u9891\u81ea\u8eab\u7684 MKV \u5143\u6570\u636e\u6765\u5224\u65ad\u662f\u5426\u5df2\u7eb3\u7ba1\u3002\u641c\u7d22\u3001\u8f6c\u6362\u548c\u4e0b\u8f7d\u5b57\u5e55\u524d\uff0c\u90fd\u4f1a\u5148\u786e\u4fdd\u5f53\u524d\u5206\u6bb5\u5df2\u7ecf\u7eb3\u7ba1\uff1b\u4e0b\u8f7d\u5b57\u5e55\u540e\u4f1a\u5148\u8f6c\u6210\u4e34\u65f6 UTF-8 SRT\uff0c\u518d\u5199\u5165\u5f53\u524d\u5206\u6bb5\u7684 MKV \u5bb9\u5668\uff0c\u6210\u529f\u540e\u81ea\u52a8\u5220\u9664\u4e34\u65f6 SRT\u3002
                             </div>
                         </div>
                         <div class="subtitles-tools-section">
-                            <h3>当前已内封字幕流</h3>
+                            <h3>\u5f53\u524d\u5df2\u5185\u5c01\u5b57\u5e55\u6d41</h3>
                             <div class="subtitles-tools-card-list">${embeddedSubtitlesHtml}</div>
                         </div>
                         <div class="subtitles-tools-section">
-                            <h3>搜索结果</h3>
+                            <h3>\u641c\u7d22\u7ed3\u679c</h3>
                             <div class="subtitles-tools-card-list">${searchResultsHtml}</div>
                         </div>
                         ${renderSummary(state.lastBatchItems)}
@@ -900,17 +931,20 @@
     async function searchActivePart() {
         const activePart = getActivePart();
         if (!activePart) {
-            throw new Error('当前未选中有效分段。');
+            throw new Error('\u5f53\u524d\u6ca1\u6709\u9009\u4e2d\u7684\u6709\u6548\u5206\u6bb5\u3002');
         }
 
-        setStatus(`正在搜索 ${activePart.Label} 的字幕……`, '');
+        setStatus(`\u6b63\u5728\u4e3a ${activePart.Label} \u641c\u7d22\u5b57\u5e55\u2026\u2026`, '');
         const payload = await apiRequest(
             `${CONFIG.apiRoot}/Items/${state.itemId}/parts/${activePart.Id}/search`,
             'POST',
             {});
         state.searchResults.set(activePart.Id, payload.Items || []);
+        state.lastBatchItems = [];
+        applyOperationResultToPart(activePart.Id, payload);
         renderOverlay();
-        setStatus(`已返回 ${payload.Items.length} 条字幕候选。`, 'success');
+        await refreshOverlayDataWithRetry(createSinglePartRefreshValidator(activePart.Id, payload));
+        setStatus(`\u5df2\u627e\u5230 ${(payload.Items || []).length} \u6761\u5b57\u5e55\u5019\u9009\u3002`, 'success');
     }
 
     function findCandidate(partId, subtitleId) {

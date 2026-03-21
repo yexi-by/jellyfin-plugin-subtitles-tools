@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 负责把视频统一转换为 MKV。
+/// 负责把视频统一转换为 MKV，并在需要时把插件自定义元数据写回 MKV。
 /// 优先尝试 remux，失败时自动退回到转码流程。
 /// </summary>
 public sealed class VideoContainerConversionService
@@ -19,8 +19,6 @@ public sealed class VideoContainerConversionService
     /// <summary>
     /// 初始化视频容器转换服务。
     /// </summary>
-    /// <param name="ffmpegProcessService">FFmpeg 进程服务。</param>
-    /// <param name="logger">日志记录器。</param>
     public VideoContainerConversionService(
         FfmpegProcessService ffmpegProcessService,
         ILogger<VideoContainerConversionService> logger)
@@ -30,16 +28,14 @@ public sealed class VideoContainerConversionService
     }
 
     /// <summary>
-    /// 确保目标视频已经转成 MKV；若当前已是 MKV，则直接返回。
+    /// 确保目标视频已经转成 MKV；若当前已是 MKV，则直接返回原路径。
+    /// 如果调用方传入自定义元数据，则会在输出 MKV 中一并写入。
     /// </summary>
-    /// <param name="mediaPath">当前媒体路径。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <param name="traceId">可选链路追踪标识。</param>
-    /// <returns>转换结果。</returns>
     public async Task<VideoConversionResult> EnsureMkvAsync(
         string mediaPath,
         CancellationToken cancellationToken,
-        string? traceId = null)
+        string? traceId = null,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
         var sourceFile = new FileInfo(mediaPath);
         if (!sourceFile.Exists)
@@ -77,8 +73,8 @@ public sealed class VideoContainerConversionService
         {
             try
             {
-                await RunRemuxAsync(sourceFile.FullName, tempOutputPath, traceId, cancellationToken).ConfigureAwait(false);
-                return FinalizeConversion(sourceFile, tempOutputPath, targetPath, usedTranscodeFallback: false);
+                await RunRemuxAsync(sourceFile.FullName, tempOutputPath, metadata, traceId, cancellationToken).ConfigureAwait(false);
+                return FinalizeConversion(sourceFile, tempOutputPath, targetPath, usedTranscodeFallback: false, "已通过 remux 输出为 MKV。");
             }
             catch (FfmpegExecutionException ex)
             {
@@ -91,26 +87,79 @@ public sealed class VideoContainerConversionService
 
                 try
                 {
-                    await RunTranscodeAsync(
-                        sourceFile.FullName,
-                        tempOutputPath,
-                        keepInputSubtitleStreams: true,
-                        traceId,
-                        cancellationToken).ConfigureAwait(false);
+                    await RunTranscodeAsync(sourceFile.FullName, tempOutputPath, keepInputSubtitleStreams: true, metadata, traceId, cancellationToken).ConfigureAwait(false);
                 }
                 catch (FfmpegExecutionException)
                 {
                     DeleteIfExists(tempOutputPath);
-                    await RunTranscodeAsync(
-                        sourceFile.FullName,
-                        tempOutputPath,
-                        keepInputSubtitleStreams: false,
-                        traceId,
-                        cancellationToken).ConfigureAwait(false);
+                    await RunTranscodeAsync(sourceFile.FullName, tempOutputPath, keepInputSubtitleStreams: false, metadata, traceId, cancellationToken).ConfigureAwait(false);
                 }
 
-                return FinalizeConversion(sourceFile, tempOutputPath, targetPath, usedTranscodeFallback: true);
+                return FinalizeConversion(sourceFile, tempOutputPath, targetPath, usedTranscodeFallback: true, "已自动转码并输出为 MKV。");
             }
+        }
+        finally
+        {
+            DeleteIfExists(tempOutputPath);
+        }
+    }
+
+    /// <summary>
+    /// 对现有 MKV 重新做一次无损 remux，并写入/覆盖插件自定义元数据。
+    /// 该方法只用于已是 MKV 但尚未带插件标签的场景。
+    /// </summary>
+    public async Task WriteMetadataAsync(
+        string mediaPath,
+        IReadOnlyDictionary<string, string> metadata,
+        CancellationToken cancellationToken,
+        string? traceId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mediaPath);
+        ArgumentNullException.ThrowIfNull(metadata);
+
+        var mediaFile = new FileInfo(mediaPath);
+        if (!mediaFile.Exists)
+        {
+            throw new FileNotFoundException("待写入元数据的媒体文件不存在。", mediaPath);
+        }
+
+        if (!string.Equals(mediaFile.Extension, ".mkv", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("只有 MKV 文件才能直接写入插件元数据。");
+        }
+
+        if (mediaFile.Directory is null)
+        {
+            throw new InvalidOperationException("媒体文件所在目录不存在，无法写入元数据。");
+        }
+
+        var tempOutputPath = Path.Combine(
+            mediaFile.Directory.FullName,
+            $"{Path.GetFileNameWithoutExtension(mediaFile.Name)}.subtitles-tools-metadata-{Guid.NewGuid():N}.tmp.mkv");
+
+        try
+        {
+            var arguments = new List<string>
+            {
+                "-y",
+                "-i",
+                mediaFile.FullName,
+                "-map",
+                "0",
+                "-map_metadata",
+                "0",
+                "-map_chapters",
+                "0",
+                "-c",
+                "copy"
+            };
+            AppendMetadataArguments(arguments, metadata);
+            arguments.Add(tempOutputPath);
+
+            await _ffmpegProcessService.RunFfmpegAsync(arguments, traceId, "write_mkv_metadata", cancellationToken).ConfigureAwait(false);
+
+            File.Delete(mediaFile.FullName);
+            File.Move(tempOutputPath, mediaFile.FullName);
         }
         finally
         {
@@ -121,29 +170,35 @@ public sealed class VideoContainerConversionService
     private async Task RunRemuxAsync(
         string sourcePath,
         string outputPath,
+        IReadOnlyDictionary<string, string>? metadata,
         string? traceId,
         CancellationToken cancellationToken)
     {
-        await _ffmpegProcessService.RunFfmpegAsync(
-            [
-                "-y",
-                "-i",
-                sourcePath,
-                "-map",
-                "0",
-                "-c",
-                "copy",
-                outputPath
-            ],
-            traceId,
-            "convert_mkv_remux",
-            cancellationToken).ConfigureAwait(false);
+        var arguments = new List<string>
+        {
+            "-y",
+            "-i",
+            sourcePath,
+            "-map",
+            "0",
+            "-map_metadata",
+            "0",
+            "-map_chapters",
+            "0",
+            "-c",
+            "copy"
+        };
+        AppendMetadataArguments(arguments, metadata);
+        arguments.Add(outputPath);
+
+        await _ffmpegProcessService.RunFfmpegAsync(arguments, traceId, "convert_mkv_remux", cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RunTranscodeAsync(
         string sourcePath,
         string outputPath,
         bool keepInputSubtitleStreams,
+        IReadOnlyDictionary<string, string>? metadata,
         string? traceId,
         CancellationToken cancellationToken)
     {
@@ -181,6 +236,7 @@ public sealed class VideoContainerConversionService
             arguments.Add("-sn");
         }
 
+        AppendMetadataArguments(arguments, metadata);
         arguments.Add(outputPath);
 
         await _ffmpegProcessService.RunFfmpegAsync(
@@ -194,7 +250,8 @@ public sealed class VideoContainerConversionService
         FileInfo sourceFile,
         string tempOutputPath,
         string targetPath,
-        bool usedTranscodeFallback)
+        bool usedTranscodeFallback,
+        string message)
     {
         if (!File.Exists(tempOutputPath))
         {
@@ -208,10 +265,22 @@ public sealed class VideoContainerConversionService
             OutputPath = targetPath,
             Container = "mkv",
             UsedTranscodeFallback = usedTranscodeFallback,
-            Message = usedTranscodeFallback
-                ? "已自动转码并输出为 MKV。"
-                : "已通过 remux 输出为 MKV。"
+            Message = message
         };
+    }
+
+    private static void AppendMetadataArguments(List<string> arguments, IReadOnlyDictionary<string, string>? metadata)
+    {
+        if (metadata is null)
+        {
+            return;
+        }
+
+        foreach (var entry in metadata)
+        {
+            arguments.Add("-metadata");
+            arguments.Add($"{entry.Key}={entry.Value}");
+        }
     }
 
     private static void DeleteIfExists(string path)
@@ -228,23 +297,8 @@ public sealed class VideoContainerConversionService
 /// </summary>
 public sealed class VideoConversionResult
 {
-    /// <summary>
-    /// 获取或设置输出路径。
-    /// </summary>
     public string OutputPath { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置输出容器格式。
-    /// </summary>
     public string Container { get; set; } = "mkv";
-
-    /// <summary>
-    /// 获取或设置是否使用了自动转码回退。
-    /// </summary>
     public bool UsedTranscodeFallback { get; set; }
-
-    /// <summary>
-    /// 获取或设置结果消息。
-    /// </summary>
     public string Message { get; set; } = string.Empty;
 }

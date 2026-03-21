@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -16,6 +16,7 @@ namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
 /// 统一封装 FFmpeg 与 FFprobe 的定位、执行和探测逻辑。
+/// 除字幕流探测外，本服务还负责读取 MKV 容器中的自定义元数据标签。
 /// </summary>
 public sealed class FfmpegProcessService
 {
@@ -26,11 +27,7 @@ public sealed class FfmpegProcessService
     /// <summary>
     /// 初始化 FFmpeg 进程服务。
     /// </summary>
-    /// <param name="applicationPaths">Jellyfin 应用路径服务。</param>
-    /// <param name="logger">日志记录器。</param>
-    public FfmpegProcessService(
-        IApplicationPaths applicationPaths,
-        ILogger<FfmpegProcessService> logger)
+    public FfmpegProcessService(IApplicationPaths applicationPaths, ILogger<FfmpegProcessService> logger)
     {
         _applicationPaths = applicationPaths;
         _logger = logger;
@@ -39,10 +36,6 @@ public sealed class FfmpegProcessService
     /// <summary>
     /// 读取 FFprobe 中的字幕流信息。
     /// </summary>
-    /// <param name="mediaPath">目标媒体路径。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <param name="traceId">可选链路追踪标识。</param>
-    /// <returns>字幕流信息列表。</returns>
     public async Task<List<ProbedSubtitleTrack>> ProbeSubtitleStreamsAsync(
         string mediaPath,
         CancellationToken cancellationToken,
@@ -51,14 +44,7 @@ public sealed class FfmpegProcessService
         ArgumentException.ThrowIfNullOrWhiteSpace(mediaPath);
 
         var result = await RunFfprobeAsync(
-            [
-                "-v",
-                "error",
-                "-show_streams",
-                "-print_format",
-                "json",
-                mediaPath
-            ],
+            ["-v", "error", "-show_streams", "-print_format", "json", mediaPath],
             traceId,
             "probe_streams",
             cancellationToken).ConfigureAwait(false);
@@ -79,20 +65,41 @@ public sealed class FfmpegProcessService
                 Codec = stream.CodecName ?? "unknown",
                 Language = string.IsNullOrWhiteSpace(stream.Tags?.Language)
                     ? "und"
-                    : stream.Tags.Language!.Trim().ToLowerInvariant(),
+                    : stream.Tags.Language.Trim().ToLowerInvariant(),
                 Title = stream.Tags?.Title?.Trim() ?? string.Empty
             })
             .ToList();
     }
 
     /// <summary>
+    /// 读取 MKV 容器的顶层标签。
+    /// 这里只把标签当作插件内部的受管身份来源，不对外暴露通用元数据能力。
+    /// </summary>
+    public async Task<Dictionary<string, string>> ProbeContainerTagsAsync(
+        string mediaPath,
+        CancellationToken cancellationToken,
+        string? traceId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mediaPath);
+
+        var result = await RunFfprobeAsync(
+            ["-v", "error", "-show_entries", "format_tags", "-print_format", "json", mediaPath],
+            traceId,
+            "probe_container_tags",
+            cancellationToken).ConfigureAwait(false);
+
+        var payload = JsonSerializer.Deserialize<FfprobeFormatPayload>(result.StandardOutput, JsonSerializerOptions);
+        if (payload?.Format?.Tags is null)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return new Dictionary<string, string>(payload.Format.Tags, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// 执行 FFmpeg 命令。
     /// </summary>
-    /// <param name="arguments">参数列表。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <param name="traceId">可选链路追踪标识。</param>
-    /// <param name="operationName">操作名称。</param>
-    /// <returns>执行结果。</returns>
     public Task<FfmpegCommandResult> RunFfmpegAsync(
         IReadOnlyList<string> arguments,
         string? traceId,
@@ -100,19 +107,12 @@ public sealed class FfmpegProcessService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(arguments);
-
-        return RunProcessAsync(
-            ResolveExecutablePath(isProbe: false),
-            arguments,
-            traceId,
-            operationName,
-            cancellationToken);
+        return RunProcessAsync(ResolveExecutablePath(isProbe: false), arguments, traceId, operationName, cancellationToken);
     }
 
     /// <summary>
-    /// 验证当前配置下是否能够解析 FFmpeg 与 FFprobe。
+    /// 验证当前配置下能否解析 FFmpeg 与 FFprobe。
     /// </summary>
-    /// <returns>验证结果。</returns>
     public (string FfmpegPath, string FfprobePath) ValidateExecutables()
     {
         return (ResolveExecutablePath(isProbe: false), ResolveExecutablePath(isProbe: true));
@@ -125,13 +125,7 @@ public sealed class FfmpegProcessService
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(arguments);
-
-        return RunProcessAsync(
-            ResolveExecutablePath(isProbe: true),
-            arguments,
-            traceId,
-            operationName,
-            cancellationToken);
+        return RunProcessAsync(ResolveExecutablePath(isProbe: true), arguments, traceId, operationName, cancellationToken);
     }
 
     private async Task<FfmpegCommandResult> RunProcessAsync(
@@ -158,11 +152,7 @@ public sealed class FfmpegProcessService
             processStartInfo.ArgumentList.Add(argument);
         }
 
-        using var process = new Process
-        {
-            StartInfo = processStartInfo
-        };
-
+        using var process = new Process { StartInfo = processStartInfo };
         var normalizedTraceId = string.IsNullOrWhiteSpace(traceId) ? "-" : traceId;
         var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation(
@@ -196,8 +186,7 @@ public sealed class FfmpegProcessService
                     process.ExitCode,
                     stopwatch.Elapsed.TotalMilliseconds,
                     string.IsNullOrWhiteSpace(standardError) ? "[empty]" : standardError);
-                throw new FfmpegExecutionException(
-                    $"FFmpeg 操作失败：{operationName}，退出码 {process.ExitCode}。{standardError}");
+                throw new FfmpegExecutionException($"FFmpeg 操作失败：{operationName}，退出码 {process.ExitCode}。{standardError}");
             }
 
             _logger.LogInformation(
@@ -215,9 +204,7 @@ public sealed class FfmpegProcessService
         }
         catch (Win32Exception ex)
         {
-            throw new FfmpegExecutionException(
-                $"无法启动可执行文件 {executablePath}，请检查 FFmpeg 路径配置。",
-                ex);
+            throw new FfmpegExecutionException($"无法启动可执行文件 {executablePath}，请检查 FFmpeg 路径配置。", ex);
         }
     }
 
@@ -229,20 +216,7 @@ public sealed class FfmpegProcessService
             return ResolveFromConfiguredPath(configuredPath, isProbe);
         }
 
-        var candidates = new List<string>();
-        if (!string.IsNullOrWhiteSpace(_applicationPaths.ProgramSystemPath))
-        {
-            var programSystemDirectory = new FileInfo(_applicationPaths.ProgramSystemPath).Directory;
-            if (programSystemDirectory is not null)
-            {
-                candidates.Add(Path.Combine(programSystemDirectory.FullName, isProbe ? "ffprobe.exe" : "ffmpeg.exe"));
-                candidates.Add(Path.Combine(programSystemDirectory.FullName, "ffmpeg", isProbe ? "ffprobe.exe" : "ffmpeg.exe"));
-            }
-        }
-
-        candidates.AddRange(TryResolveFromPath(isProbe ? "ffprobe" : "ffmpeg"));
-
-        foreach (var candidate in candidates.Where(candidate => !string.IsNullOrWhiteSpace(candidate)))
+        foreach (var candidate in EnumerateAutomaticCandidates(isProbe))
         {
             if (File.Exists(candidate))
             {
@@ -253,12 +227,45 @@ public sealed class FfmpegProcessService
         return isProbe ? "ffprobe" : "ffmpeg";
     }
 
+    private IEnumerable<string> EnumerateAutomaticCandidates(bool isProbe)
+    {
+        var executableName = isProbe
+            ? OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe"
+            : OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg";
+
+        if (!string.IsNullOrWhiteSpace(_applicationPaths.ProgramSystemPath))
+        {
+            var programSystemDirectory = new FileInfo(_applicationPaths.ProgramSystemPath).Directory;
+            if (programSystemDirectory is not null)
+            {
+                yield return Path.Combine(programSystemDirectory.FullName, executableName);
+                yield return Path.Combine(programSystemDirectory.FullName, "ffmpeg", executableName);
+            }
+        }
+
+        if (!OperatingSystem.IsWindows())
+        {
+            yield return Path.Combine("/usr/lib/jellyfin-ffmpeg", executableName);
+            yield return Path.Combine("/usr/lib/jellyfin-ffmpeg7", executableName);
+            yield return Path.Combine("/usr/bin", executableName);
+        }
+
+        foreach (var pathCandidate in TryResolveFromPath(isProbe ? "ffprobe" : "ffmpeg"))
+        {
+            yield return pathCandidate;
+        }
+    }
+
     private static string ResolveFromConfiguredPath(string configuredPath, bool isProbe)
     {
         var fullPath = Path.GetFullPath(configuredPath);
+        var executableName = isProbe
+            ? OperatingSystem.IsWindows() ? "ffprobe.exe" : "ffprobe"
+            : OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg";
+
         if (Directory.Exists(fullPath))
         {
-            var executablePath = Path.Combine(fullPath, isProbe ? "ffprobe.exe" : "ffmpeg.exe");
+            var executablePath = Path.Combine(fullPath, executableName);
             if (File.Exists(executablePath))
             {
                 return executablePath;
@@ -277,9 +284,7 @@ public sealed class FfmpegProcessService
             return fullPath;
         }
 
-        var siblingProbe = Path.Combine(
-            Path.GetDirectoryName(fullPath) ?? string.Empty,
-            "ffprobe" + Path.GetExtension(fullPath));
+        var siblingProbe = Path.Combine(Path.GetDirectoryName(fullPath) ?? string.Empty, executableName);
         if (File.Exists(siblingProbe))
         {
             return siblingProbe;
@@ -290,9 +295,10 @@ public sealed class FfmpegProcessService
 
     private static string[] TryResolveFromPath(string executableName)
     {
+        var locator = OperatingSystem.IsWindows() ? "where" : "which";
         var startInfo = new ProcessStartInfo
         {
-            FileName = "where",
+            FileName = locator,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -327,51 +333,42 @@ public sealed class FfmpegProcessService
 
     private sealed class FfprobePayload
     {
-        /// <summary>
-        /// 获取或设置流集合。
-        /// </summary>
         [JsonPropertyName("streams")]
         public List<FfprobeStream>? Streams { get; set; }
     }
 
     private sealed class FfprobeStream
     {
-        /// <summary>
-        /// 获取或设置绝对流索引。
-        /// </summary>
         [JsonPropertyName("index")]
         public int Index { get; set; }
 
-        /// <summary>
-        /// 获取或设置编解码类型。
-        /// </summary>
         [JsonPropertyName("codec_type")]
         public string CodecType { get; set; } = string.Empty;
 
-        /// <summary>
-        /// 获取或设置编解码名称。
-        /// </summary>
         [JsonPropertyName("codec_name")]
         public string? CodecName { get; set; }
 
-        /// <summary>
-        /// 获取或设置标签信息。
-        /// </summary>
         [JsonPropertyName("tags")]
         public FfprobeTags? Tags { get; set; }
     }
 
+    private sealed class FfprobeFormatPayload
+    {
+        [JsonPropertyName("format")]
+        public FfprobeFormat? Format { get; set; }
+    }
+
+    private sealed class FfprobeFormat
+    {
+        [JsonPropertyName("tags")]
+        public Dictionary<string, string>? Tags { get; set; }
+    }
+
     private sealed class FfprobeTags
     {
-        /// <summary>
-        /// 获取或设置语言标签。
-        /// </summary>
         [JsonPropertyName("language")]
         public string? Language { get; set; }
 
-        /// <summary>
-        /// 获取或设置标题标签。
-        /// </summary>
         [JsonPropertyName("title")]
         public string? Title { get; set; }
     }
@@ -382,14 +379,7 @@ public sealed class FfmpegProcessService
 /// </summary>
 public sealed class FfmpegCommandResult
 {
-    /// <summary>
-    /// 获取或设置标准输出。
-    /// </summary>
     public string StandardOutput { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置标准错误。
-    /// </summary>
     public string StandardError { get; set; } = string.Empty;
 }
 
@@ -402,29 +392,10 @@ public sealed class FfmpegCommandResult
     Justification = "该类型表示探测出的字幕轨摘要，而不是 System.IO.Stream。")]
 public sealed class ProbedSubtitleTrack
 {
-    /// <summary>
-    /// 获取或设置绝对流索引。
-    /// </summary>
     public int StreamIndex { get; set; }
-
-    /// <summary>
-    /// 获取或设置字幕流相对索引。
-    /// </summary>
     public int SubtitleStreamIndex { get; set; }
-
-    /// <summary>
-    /// 获取或设置字幕编码格式。
-    /// </summary>
     public string Codec { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 获取或设置语言码。
-    /// </summary>
     public string Language { get; set; } = "und";
-
-    /// <summary>
-    /// 获取或设置字幕轨标题。
-    /// </summary>
     public string Title { get; set; } = string.Empty;
 }
 
@@ -433,17 +404,11 @@ public sealed class ProbedSubtitleTrack
 /// </summary>
 public sealed class FfmpegExecutionException : Exception
 {
-    /// <summary>
-    /// 初始化 FFmpeg 执行异常。
-    /// </summary>
     public FfmpegExecutionException(string message)
         : base(message)
     {
     }
 
-    /// <summary>
-    /// 初始化带内部异常的 FFmpeg 执行异常。
-    /// </summary>
     public FfmpegExecutionException(string message, Exception innerException)
         : base(message, innerException)
     {

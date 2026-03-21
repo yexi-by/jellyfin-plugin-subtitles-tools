@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,29 +8,28 @@ using MediaBrowser.Model.Tasks;
 namespace Jellyfin.Plugin.SubtitlesTools;
 
 /// <summary>
-/// 在 Jellyfin 计划任务中提供“补算缺失视频哈希”的手动入口。
+/// 在 Jellyfin 计划任务中提供“纳管未处理视频为 MKV”的手动入口。
 /// </summary>
 public sealed class PrecomputeMissingHashesScheduledTask : IScheduledTask, IConfigurableScheduledTask
 {
     private readonly VideoHashBackfillService _videoHashBackfillService;
 
     /// <summary>
-    /// 初始化缺失视频哈希回填任务。
+    /// 初始化手动纳管任务。
     /// </summary>
-    /// <param name="videoHashBackfillService">缺失视频哈希回填服务。</param>
     public PrecomputeMissingHashesScheduledTask(VideoHashBackfillService videoHashBackfillService)
     {
         _videoHashBackfillService = videoHashBackfillService;
     }
 
     /// <inheritdoc />
-    public string Name => "预计算缺失的视频哈希";
+    public string Name => "纳管未处理视频为 MKV";
 
     /// <inheritdoc />
     public string Key => "SubtitlesTools.PrecomputeMissingVideoHashes";
 
     /// <inheritdoc />
-    public string Description => "扫描 Jellyfin 已入库的电影和剧集，为尚未缓存 GCID/CID 的本地视频文件补算哈希。";
+    public string Description => "扫描 Jellyfin 已入库的电影和剧集，把尚未纳管的本地视频统一纳管为 MKV，并在 MKV 元数据中写入原始 CID/GCID。";
 
     /// <inheritdoc />
     public string Category => "Subtitles Tools";
@@ -47,7 +46,7 @@ public sealed class PrecomputeMissingHashesScheduledTask : IScheduledTask, IConf
     /// <inheritdoc />
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        return _videoHashBackfillService.PrecomputeMissingHashesAsync(progress, cancellationToken);
+        return _videoHashBackfillService.ManageUnprocessedVideosAsync(progress, cancellationToken);
     }
 
     /// <inheritdoc />

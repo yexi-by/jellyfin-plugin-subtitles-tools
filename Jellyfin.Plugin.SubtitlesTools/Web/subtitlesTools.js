@@ -1,4 +1,4 @@
-const SubtitlesToolsConfig = {
+﻿const SubtitlesToolsConfig = {
     pluginUniqueId: 'b812b763-a31d-4d19-bfcc-15b9eac432cb'
 };
 
@@ -11,8 +11,6 @@ function readForm(page) {
     return {
         ServiceBaseUrl: page.querySelector('#serviceBaseUrl').value.trim(),
         RequestTimeoutSeconds: Number.parseInt(page.querySelector('#requestTimeoutSeconds').value, 10) || 10,
-        EnableAutoHashPrecompute: page.querySelector('#enableAutoHashPrecompute').checked,
-        HashPrecomputeConcurrency: Number.parseInt(page.querySelector('#hashPrecomputeConcurrency').value, 10) || 1,
         EnableAutoVideoConvertToMkv: page.querySelector('#enableAutoVideoConvertToMkv').checked,
         VideoConvertConcurrency: Number.parseInt(page.querySelector('#videoConvertConcurrency').value, 10) || 1,
         FfmpegExecutablePath: page.querySelector('#ffmpegExecutablePath').value.trim()
@@ -45,8 +43,6 @@ export default function (view) {
         ApiClient.getPluginConfiguration(SubtitlesToolsConfig.pluginUniqueId).then(config => {
             view.querySelector('#serviceBaseUrl').value = config.ServiceBaseUrl || 'http://127.0.0.1:8055';
             view.querySelector('#requestTimeoutSeconds').value = config.RequestTimeoutSeconds || 10;
-            view.querySelector('#enableAutoHashPrecompute').checked = config.EnableAutoHashPrecompute !== false;
-            view.querySelector('#hashPrecomputeConcurrency').value = config.HashPrecomputeConcurrency || 1;
             view.querySelector('#enableAutoVideoConvertToMkv').checked = config.EnableAutoVideoConvertToMkv !== false;
             view.querySelector('#videoConvertConcurrency').value = config.VideoConvertConcurrency || 1;
             view.querySelector('#ffmpegExecutablePath').value = config.FfmpegExecutablePath || '';
@@ -106,8 +102,6 @@ export default function (view) {
             const formValue = readForm(view);
             config.ServiceBaseUrl = formValue.ServiceBaseUrl;
             config.RequestTimeoutSeconds = formValue.RequestTimeoutSeconds;
-            config.EnableAutoHashPrecompute = formValue.EnableAutoHashPrecompute;
-            config.HashPrecomputeConcurrency = formValue.HashPrecomputeConcurrency;
             config.EnableAutoVideoConvertToMkv = formValue.EnableAutoVideoConvertToMkv;
             config.VideoConvertConcurrency = formValue.VideoConvertConcurrency;
             config.FfmpegExecutablePath = formValue.FfmpegExecutablePath;

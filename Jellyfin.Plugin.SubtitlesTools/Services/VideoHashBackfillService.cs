@@ -1,123 +1,137 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.SubtitlesTools.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.IO;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 扫描现有媒体库并补算缺失的视频哈希，供计划任务手动触发。
+/// 扫描现有媒体库，把尚未被插件纳管的本地视频统一纳管为受管 MKV。
+/// 当前版本不再依赖插件侧哈希归档，而是只认 MKV 自定义元数据。
 /// </summary>
 public sealed class VideoHashBackfillService
 {
     private readonly ILibraryManager _libraryManager;
-    private readonly VideoHashResolverService _videoHashResolverService;
+    private readonly IProviderManager _providerManager;
+    private readonly IFileSystem _fileSystem;
+    private readonly MkvMetadataIdentityService _mkvMetadataIdentityService;
     private readonly ILogger<VideoHashBackfillService> _logger;
 
     /// <summary>
-    /// 初始化缺失视频哈希回填服务。
+    /// 初始化手动纳管回填服务。
     /// </summary>
-    /// <param name="libraryManager">媒体库管理器。</param>
-    /// <param name="videoHashResolverService">视频哈希解析服务。</param>
-    /// <param name="logger">日志记录器。</param>
     public VideoHashBackfillService(
         ILibraryManager libraryManager,
-        VideoHashResolverService videoHashResolverService,
+        IProviderManager providerManager,
+        IFileSystem fileSystem,
+        MkvMetadataIdentityService mkvMetadataIdentityService,
         ILogger<VideoHashBackfillService> logger)
     {
         _libraryManager = libraryManager;
-        _videoHashResolverService = videoHashResolverService;
+        _providerManager = providerManager;
+        _fileSystem = fileSystem;
+        _mkvMetadataIdentityService = mkvMetadataIdentityService;
         _logger = logger;
     }
 
     /// <summary>
-    /// 扫描 Jellyfin 已入库的本地电影和剧集，补算所有缺失的视频哈希。
+    /// 扫描 Jellyfin 已入库的本地电影和剧集，把尚未纳管的文件统一纳管为 MKV。
     /// </summary>
-    /// <param name="progress">任务进度汇报器。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <returns>异步任务。</returns>
-    public async Task PrecomputeMissingHashesAsync(IProgress<double> progress, CancellationToken cancellationToken)
+    public async Task ManageUnprocessedVideosAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(progress);
 
-        var concurrency = GetNormalizedConcurrency();
-        var candidatePaths = EnumerateEligibleMediaPaths().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        var missingPaths = new List<string>(candidatePaths.Length);
+        var candidates = EnumerateEligibleItems().ToArray();
+        var unmanagedItems = new List<EligibleMediaItem>(candidates.Length);
 
-        foreach (var mediaPath in candidatePaths)
+        foreach (var candidate in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var cached = await _videoHashResolverService.TryGetCachedAsync(mediaPath, cancellationToken).ConfigureAwait(false);
-            if (cached is null)
+
+            if (!string.Equals(Path.GetExtension(candidate.MediaPath), ".mkv", StringComparison.OrdinalIgnoreCase))
             {
-                missingPaths.Add(mediaPath);
+                unmanagedItems.Add(candidate);
+                continue;
+            }
+
+            var identity = await _mkvMetadataIdentityService
+                .TryGetIdentityAsync(candidate.MediaPath, cancellationToken)
+                .ConfigureAwait(false);
+            if (identity is null)
+            {
+                unmanagedItems.Add(candidate);
             }
         }
 
-        if (missingPaths.Count == 0)
+        if (unmanagedItems.Count == 0)
         {
             progress.Report(100);
-            _logger.LogInformation("manual_hash_backfill_complete candidates={CandidateCount} missing=0", candidatePaths.Length);
+            _logger.LogInformation("manual_manage_backfill_complete candidates={CandidateCount} unmanaged=0", candidates.Length);
             return;
         }
 
+        var concurrency = GetNormalizedConcurrency();
         _logger.LogInformation(
-            "manual_hash_backfill_start candidates={CandidateCount} missing={MissingCount} concurrency={Concurrency}",
-            candidatePaths.Length,
-            missingPaths.Count,
+            "manual_manage_backfill_start candidates={CandidateCount} unmanaged={UnmanagedCount} concurrency={Concurrency}",
+            candidates.Length,
+            unmanagedItems.Count,
             concurrency);
 
         var completedCount = 0;
         await Parallel.ForEachAsync(
-            missingPaths,
+            unmanagedItems,
             new ParallelOptions
             {
                 MaxDegreeOfParallelism = concurrency,
                 CancellationToken = cancellationToken
             },
-            async (mediaPath, token) =>
+            async (candidate, token) =>
             {
                 var traceId = CreateTraceId();
                 try
                 {
-                    await _videoHashResolverService.ResolveAsync(mediaPath, token, traceId).ConfigureAwait(false);
+                    var result = await _mkvMetadataIdentityService
+                        .EnsureManagedAsync(candidate.MediaPath, token, traceId)
+                        .ConfigureAwait(false);
+                    if (result.ConvertedToMkv || result.WroteMetadata)
+                    {
+                        QueueItemRefresh(candidate.ItemId);
+                    }
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or FfmpegExecutionException)
                 {
                     _logger.LogWarning(
                         ex,
-                        "trace={TraceId} manual_hash_backfill_item_failed media_path={MediaPath}",
+                        "trace={TraceId} manual_manage_backfill_item_failed media_path={MediaPath}",
                         traceId,
-                        mediaPath);
+                        candidate.MediaPath);
                 }
                 finally
                 {
                     var current = Interlocked.Increment(ref completedCount);
-                    progress.Report(current * 100d / missingPaths.Count);
+                    progress.Report(current * 100d / unmanagedItems.Count);
                 }
             }).ConfigureAwait(false);
 
         _logger.LogInformation(
-            "manual_hash_backfill_complete candidates={CandidateCount} missing={MissingCount} concurrency={Concurrency}",
-            candidatePaths.Length,
-            missingPaths.Count,
+            "manual_manage_backfill_complete candidates={CandidateCount} unmanaged={UnmanagedCount} concurrency={Concurrency}",
+            candidates.Length,
+            unmanagedItems.Count,
             concurrency);
     }
 
     /// <summary>
-    /// 判断一个已入库项目是否符合“本地电影或剧集文件”的预计算条件。
+    /// 判断一个已入库项目是否符合“本地电影或剧集文件”的纳管条件。
     /// </summary>
-    /// <param name="item">待判断的媒体库项目。</param>
-    /// <param name="mediaPath">输出的本地文件路径。</param>
-    /// <returns>符合条件时返回 <see langword="true"/>。</returns>
     internal static bool TryGetEligibleMediaPath(BaseItem? item, out string mediaPath)
     {
         mediaPath = string.Empty;
@@ -131,19 +145,76 @@ public sealed class VideoHashBackfillService
             return false;
         }
 
-        if (string.Equals(Path.GetExtension(item.Path), ".strm", StringComparison.OrdinalIgnoreCase))
+        var itemPath = item.Path.Trim();
+        if (string.Equals(Path.GetExtension(itemPath), ".strm", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
-        var fileInfo = new FileInfo(item.Path);
-        if (!fileInfo.Exists)
+        var directFile = new FileInfo(itemPath);
+        if (directFile.Exists)
         {
-            return false;
+            mediaPath = directFile.FullName;
+            return true;
         }
 
-        mediaPath = fileInfo.FullName;
-        return true;
+        var fallbackMkvPath = Path.Combine(
+            Path.GetDirectoryName(itemPath) ?? string.Empty,
+            $"{Path.GetFileNameWithoutExtension(itemPath)}.mkv");
+        var fallbackFile = new FileInfo(fallbackMkvPath);
+        if (fallbackFile.Exists)
+        {
+            mediaPath = fallbackFile.FullName;
+            return true;
+        }
+
+        return false;
+    }
+
+    private IEnumerable<EligibleMediaItem> EnumerateEligibleItems()
+    {
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in _libraryManager.RootFolder.GetRecursiveChildren())
+        {
+            if (!TryGetEligibleMediaPath(item, out var mediaPath))
+            {
+                continue;
+            }
+
+            if (!seenPaths.Add(mediaPath))
+            {
+                continue;
+            }
+
+            yield return new EligibleMediaItem
+            {
+                ItemId = item.Id,
+                MediaPath = mediaPath
+            };
+        }
+    }
+
+    private void QueueItemRefresh(Guid itemId)
+    {
+        var refreshOptions = new MetadataRefreshOptions(new DirectoryService(_fileSystem))
+        {
+            MetadataRefreshMode = MetadataRefreshMode.None,
+            ImageRefreshMode = MetadataRefreshMode.None,
+            ReplaceAllImages = false,
+            ReplaceAllMetadata = false,
+            ForceSave = false,
+            IsAutomated = false,
+            RemoveOldMetadata = false,
+            RegenerateTrickplay = false
+        };
+
+        _providerManager.QueueRefresh(itemId, refreshOptions, RefreshPriority.High);
+    }
+
+    private static int GetNormalizedConcurrency()
+    {
+        var rawConfiguration = Plugin.Instance?.Configuration ?? new Configuration.PluginConfiguration();
+        return Configuration.PluginConfiguration.NormalizeVideoConvertConcurrency(rawConfiguration.VideoConvertConcurrency);
     }
 
     private static string CreateTraceId()
@@ -151,20 +222,12 @@ public sealed class VideoHashBackfillService
         return Guid.NewGuid().ToString("N")[..12];
     }
 
-    private IEnumerable<string> EnumerateEligibleMediaPaths()
+    /// <summary>
+    /// 表示一个待纳管的 Jellyfin 媒体项。
+    /// </summary>
+    private sealed class EligibleMediaItem
     {
-        foreach (var item in _libraryManager.RootFolder.GetRecursiveChildren())
-        {
-            if (TryGetEligibleMediaPath(item, out var mediaPath))
-            {
-                yield return mediaPath;
-            }
-        }
-    }
-
-    private static int GetNormalizedConcurrency()
-    {
-        var rawConfiguration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-        return PluginConfiguration.NormalizeHashPrecomputeConcurrency(rawConfiguration.HashPrecomputeConcurrency);
+        public Guid ItemId { get; set; }
+        public string MediaPath { get; set; } = string.Empty;
     }
 }

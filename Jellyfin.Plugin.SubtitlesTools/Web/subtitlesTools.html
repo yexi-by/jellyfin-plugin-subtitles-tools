@@ -1,4 +1,4 @@
-<div id="SubtitlesToolsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/subtitlesToolsjsv2">
+﻿<div id="SubtitlesToolsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/subtitlesToolsjsv2">
     <style>
         #SubtitlesToolsConfigPage .subtitlesToolsConfigFooter {
             background: var(--theme-body-background, #101010);
@@ -15,7 +15,7 @@
                         当前版本面向 Jellyfin 10.11.6 及更新的 10.11 系列，只处理本地 Movie 和 Episode 文件。
                     </div>
                     <div class="fieldDescription">
-                        插件现在统一走“原始 CID/GCID -> 迅雷搜字幕 -> 转 UTF-8 SRT -> 软字幕内封到 MKV”的流程，不再保留外挂字幕能力。
+                        插件现在只认视频自身的 MKV 元数据来判断是否已纳管，并统一走“确保纳管 -> 迅雷搜字幕 -> 转 UTF-8 SRT -> 软字幕内封到 MKV”的流程。
                     </div>
                     <div class="fieldDescription">
                         Python 服务端项目：
@@ -35,28 +35,11 @@
 
                 <div class="checkboxContainer checkboxContainer-withDescription">
                     <label class="emby-checkbox-label">
-                        <input is="emby-checkbox" id="enableAutoHashPrecompute" type="checkbox" />
-                        <span>新视频入库后自动计算原始 CID/GCID</span>
-                    </label>
-                    <div class="fieldDescription">
-                        默认开启。该哈希档案会在视频转成 MKV 后继续保留，后续检索迅雷字幕始终优先使用原始哈希。
-                    </div>
-                </div>
-
-                <div class="inputContainer">
-                    <input is="emby-input" id="hashPrecomputeConcurrency" type="number" min="1" max="8" label="哈希后台并发数" />
-                    <div class="fieldDescription">
-                        仅在关闭“自动转 MKV”时生效。网络盘建议保持 1，本地 SSD 可视情况调大。
-                    </div>
-                </div>
-
-                <div class="checkboxContainer checkboxContainer-withDescription">
-                    <label class="emby-checkbox-label">
                         <input is="emby-checkbox" id="enableAutoVideoConvertToMkv" type="checkbox" />
-                        <span>新视频入库后自动转换为 MKV</span>
+                        <span>新视频入库后自动纳管为 MKV</span>
                     </label>
                     <div class="fieldDescription">
-                        默认开启。转换前一定会先确保原始 CID/GCID 已落档；分段电影按逐段自动转换。
+                        默认开启。新入库文件若已是 MKV，则会自动补算 CID/GCID 并写入 MKV 元数据；若不是 MKV，则会先计算 CID/GCID，再转换为 MKV 并写入元数据。
                     </div>
                 </div>
 

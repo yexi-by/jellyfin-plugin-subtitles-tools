@@ -1,4 +1,4 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Net.Http.Headers;
 using Jellyfin.Plugin.SubtitlesTools.Services;
 using MediaBrowser.Controller;
@@ -31,14 +31,12 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         });
 
         serviceCollection.AddSingleton<VideoHashCalculator>();
-        serviceCollection.AddSingleton<VideoHashCacheService>();
-        serviceCollection.AddSingleton<VideoHashResolverService>();
-        serviceCollection.AddSingleton<OriginalVideoHashArchiveService>();
         serviceCollection.AddSingleton<VideoHashBackfillService>();
         serviceCollection.AddSingleton<SubtitlesToolsApiClient>();
         serviceCollection.AddSingleton<SubtitleMetadataService>();
         serviceCollection.AddSingleton<FfmpegProcessService>();
         serviceCollection.AddSingleton<VideoContainerConversionService>();
+        serviceCollection.AddSingleton<MkvMetadataIdentityService>();
         serviceCollection.AddSingleton<SubtitleSrtConversionService>();
         serviceCollection.AddSingleton<EmbeddedSubtitleService>();
         serviceCollection.AddSingleton<MultipartMediaParserService>();
@@ -46,6 +44,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<PrecomputeMissingHashesScheduledTask>();
         serviceCollection.AddSingleton<VideoHashPrecomputeService>();
 
+        serviceCollection.AddHostedService<LegacyDataCleanupService>();
         serviceCollection.AddHostedService<WebUiInjectionService>();
         serviceCollection.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<VideoHashPrecomputeService>());
     }

@@ -1,32 +1,31 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Jellyfin.Plugin.SubtitlesTools.Configuration;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.IO;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 在插件后台持续消费“新视频入库后的自动处理”队列。
-/// 该服务负责两件事：
-/// 1. 先为新媒体确保原始 CID/GCID 已被持久化。
-/// 2. 若配置开启，则继续把该媒体自动转换为 MKV。
+/// 在插件后台持续处理“新视频入库后自动纳管为 MKV”的任务队列。
+/// 自动纳管会统一走“确保当前文件已被 MKV 元数据纳管”的流程。
 /// </summary>
 public sealed class VideoHashPrecomputeService : BackgroundService
 {
-    private readonly record struct HashPrecomputeWorkItem(string MediaPath, string TraceId, bool IsAutomatic);
+    private readonly record struct ManageWorkItem(Guid ItemId, string MediaPath, string TraceId);
 
     private readonly ILibraryManager _libraryManager;
-    private readonly OriginalVideoHashArchiveService _originalVideoHashArchiveService;
-    private readonly VideoContainerConversionService _videoContainerConversionService;
+    private readonly IProviderManager _providerManager;
+    private readonly IFileSystem _fileSystem;
+    private readonly MkvMetadataIdentityService _mkvMetadataIdentityService;
     private readonly ILogger<VideoHashPrecomputeService> _logger;
-    private readonly Channel<HashPrecomputeWorkItem> _queue = Channel.CreateUnbounded<HashPrecomputeWorkItem>(
+    private readonly Channel<ManageWorkItem> _queue = Channel.CreateUnbounded<ManageWorkItem>(
         new UnboundedChannelOptions
         {
             SingleReader = true,
@@ -35,21 +34,19 @@ public sealed class VideoHashPrecomputeService : BackgroundService
     private readonly ConcurrentDictionary<string, byte> _scheduledMediaPaths = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// 初始化自动哈希与自动转 MKV 后台服务。
+    /// 初始化后台自动纳管服务。
     /// </summary>
-    /// <param name="libraryManager">媒体库管理器。</param>
-    /// <param name="originalVideoHashArchiveService">原始媒体哈希档案服务。</param>
-    /// <param name="videoContainerConversionService">视频容器转换服务。</param>
-    /// <param name="logger">日志记录器。</param>
     public VideoHashPrecomputeService(
         ILibraryManager libraryManager,
-        OriginalVideoHashArchiveService originalVideoHashArchiveService,
-        VideoContainerConversionService videoContainerConversionService,
+        IProviderManager providerManager,
+        IFileSystem fileSystem,
+        MkvMetadataIdentityService mkvMetadataIdentityService,
         ILogger<VideoHashPrecomputeService> logger)
     {
         _libraryManager = libraryManager;
-        _originalVideoHashArchiveService = originalVideoHashArchiveService;
-        _videoContainerConversionService = videoContainerConversionService;
+        _providerManager = providerManager;
+        _fileSystem = fileSystem;
+        _mkvMetadataIdentityService = mkvMetadataIdentityService;
         _logger = logger;
     }
 
@@ -71,19 +68,9 @@ public sealed class VideoHashPrecomputeService : BackgroundService
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var runningTasks = new List<Task>();
-
         while (!stoppingToken.IsCancellationRequested)
         {
-            runningTasks.RemoveAll(static task => task.IsCompleted);
-
-            if (runningTasks.Count >= GetEffectiveWorkerConcurrency())
-            {
-                await Task.WhenAny(runningTasks).ConfigureAwait(false);
-                continue;
-            }
-
-            HashPrecomputeWorkItem workItem;
+            ManageWorkItem workItem;
             try
             {
                 workItem = await _queue.Reader.ReadAsync(stoppingToken).ConfigureAwait(false);
@@ -97,15 +84,8 @@ public sealed class VideoHashPrecomputeService : BackgroundService
                 break;
             }
 
-            runningTasks.Add(ProcessWorkItemAsync(workItem, stoppingToken));
+            await ProcessWorkItemAsync(workItem, stoppingToken).ConfigureAwait(false);
         }
-
-        await Task.WhenAll(runningTasks).ConfigureAwait(false);
-    }
-
-    private static string CreateTraceId()
-    {
-        return Guid.NewGuid().ToString("N")[..12];
     }
 
     private void OnLibraryItemAdded(object? sender, ItemChangeEventArgs eventArgs)
@@ -122,64 +102,45 @@ public sealed class VideoHashPrecomputeService : BackgroundService
 
         if (_scheduledMediaPaths.TryAdd(mediaPath, 0))
         {
-            _queue.Writer.TryWrite(new HashPrecomputeWorkItem(mediaPath, CreateTraceId(), IsAutomatic: true));
-            _logger.LogInformation("auto_media_enqueue media_path={MediaPath}", mediaPath);
+            _queue.Writer.TryWrite(new ManageWorkItem(eventArgs.Item.Id, mediaPath, CreateTraceId()));
+            _logger.LogInformation("auto_manage_enqueue media_path={MediaPath}", mediaPath);
         }
     }
 
-    private async Task ProcessWorkItemAsync(HashPrecomputeWorkItem workItem, CancellationToken cancellationToken)
+    private async Task ProcessWorkItemAsync(ManageWorkItem workItem, CancellationToken cancellationToken)
     {
         try
         {
-            if (workItem.IsAutomatic && !ShouldHandleNewItem())
+            if (!ShouldHandleNewItem())
             {
                 _logger.LogDebug(
-                    "trace={TraceId} auto_media_skip_disabled media_path={MediaPath}",
+                    "trace={TraceId} auto_manage_skip_disabled media_path={MediaPath}",
                     workItem.TraceId,
                     workItem.MediaPath);
                 return;
             }
 
-            var configuration = GetNormalizedConfiguration();
-            var hashArchive = await _originalVideoHashArchiveService
-                .EnsureAsync(workItem.MediaPath, cancellationToken, workItem.TraceId)
+            var result = await _mkvMetadataIdentityService
+                .EnsureManagedAsync(workItem.MediaPath, cancellationToken, workItem.TraceId)
                 .ConfigureAwait(false);
-
-            _logger.LogInformation(
-                "trace={TraceId} auto_hash_complete media_path={MediaPath} original_gcid={OriginalGcid} current_path={CurrentPath}",
-                workItem.TraceId,
-                workItem.MediaPath,
-                hashArchive.OriginalGcid,
-                hashArchive.CurrentMediaPath);
-
-            if (!configuration.EnableAutoVideoConvertToMkv)
+            if (result.ConvertedToMkv || result.WroteMetadata)
             {
-                return;
-            }
-
-            var conversionResult = await _videoContainerConversionService
-                .EnsureMkvAsync(hashArchive.CurrentMediaPath, cancellationToken, workItem.TraceId)
-                .ConfigureAwait(false);
-
-            if (!string.Equals(hashArchive.CurrentMediaPath, conversionResult.OutputPath, StringComparison.OrdinalIgnoreCase))
-            {
-                await _originalVideoHashArchiveService
-                    .UpdateCurrentPathAsync(hashArchive, conversionResult.OutputPath, cancellationToken)
-                    .ConfigureAwait(false);
+                QueueItemRefresh(workItem.ItemId);
             }
 
             _logger.LogInformation(
-                "trace={TraceId} auto_video_convert_complete media_path={MediaPath} output_path={OutputPath} used_transcode_fallback={UsedTranscodeFallback}",
+                "trace={TraceId} auto_manage_complete media_path={MediaPath} output_path={OutputPath} converted={ConvertedToMkv} wrote_metadata={WroteMetadata}",
                 workItem.TraceId,
                 workItem.MediaPath,
-                conversionResult.OutputPath,
-                conversionResult.UsedTranscodeFallback);
+                result.Identity.MediaPath,
+                result.ConvertedToMkv,
+                result.WroteMetadata);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or FfmpegExecutionException)
         {
             _logger.LogWarning(
                 ex,
-                "trace={TraceId} auto_media_process_failed media_path={MediaPath}",
+                "trace={TraceId} auto_manage_failed media_path={MediaPath}",
                 workItem.TraceId,
                 workItem.MediaPath);
         }
@@ -189,35 +150,31 @@ public sealed class VideoHashPrecomputeService : BackgroundService
         }
     }
 
-    private bool ShouldHandleNewItem()
+    private void QueueItemRefresh(Guid itemId)
     {
-        var configuration = GetNormalizedConfiguration();
-        return configuration.EnableAutoHashPrecompute || configuration.EnableAutoVideoConvertToMkv;
-    }
-
-    private int GetEffectiveWorkerConcurrency()
-    {
-        var configuration = GetNormalizedConfiguration();
-        if (configuration.EnableAutoVideoConvertToMkv)
+        var refreshOptions = new MetadataRefreshOptions(new DirectoryService(_fileSystem))
         {
-            return configuration.VideoConvertConcurrency;
-        }
-
-        return configuration.HashPrecomputeConcurrency;
-    }
-
-    private PluginConfiguration GetNormalizedConfiguration()
-    {
-        var rawConfiguration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
-        return new PluginConfiguration
-        {
-            ServiceBaseUrl = PluginConfiguration.NormalizeServiceBaseUrl(rawConfiguration.ServiceBaseUrl),
-            RequestTimeoutSeconds = PluginConfiguration.NormalizeTimeoutSeconds(rawConfiguration.RequestTimeoutSeconds),
-            EnableAutoHashPrecompute = rawConfiguration.EnableAutoHashPrecompute,
-            HashPrecomputeConcurrency = PluginConfiguration.NormalizeHashPrecomputeConcurrency(rawConfiguration.HashPrecomputeConcurrency),
-            EnableAutoVideoConvertToMkv = rawConfiguration.EnableAutoVideoConvertToMkv,
-            VideoConvertConcurrency = PluginConfiguration.NormalizeVideoConvertConcurrency(rawConfiguration.VideoConvertConcurrency),
-            FfmpegExecutablePath = PluginConfiguration.NormalizeFfmpegExecutablePath(rawConfiguration.FfmpegExecutablePath)
+            MetadataRefreshMode = MetadataRefreshMode.None,
+            ImageRefreshMode = MetadataRefreshMode.None,
+            ReplaceAllImages = false,
+            ReplaceAllMetadata = false,
+            ForceSave = false,
+            IsAutomated = true,
+            RemoveOldMetadata = false,
+            RegenerateTrickplay = false
         };
+
+        _providerManager.QueueRefresh(itemId, refreshOptions, RefreshPriority.High);
+    }
+
+    private static bool ShouldHandleNewItem()
+    {
+        var configuration = Plugin.Instance?.Configuration ?? new Configuration.PluginConfiguration();
+        return configuration.EnableAutoVideoConvertToMkv;
+    }
+
+    private static string CreateTraceId()
+    {
+        return Guid.NewGuid().ToString("N")[..12];
     }
 }

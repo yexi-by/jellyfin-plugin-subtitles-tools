@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -20,8 +20,6 @@ public sealed class EmbeddedSubtitleService
     /// <summary>
     /// 初始化内封字幕服务。
     /// </summary>
-    /// <param name="ffmpegProcessService">FFmpeg 进程服务。</param>
-    /// <param name="subtitleMetadataService">字幕元数据服务。</param>
     public EmbeddedSubtitleService(
         FfmpegProcessService ffmpegProcessService,
         SubtitleMetadataService subtitleMetadataService)
@@ -33,10 +31,6 @@ public sealed class EmbeddedSubtitleService
     /// <summary>
     /// 读取当前媒体中的字幕流。
     /// </summary>
-    /// <param name="mediaFile">目标媒体文件。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <param name="traceId">可选链路追踪标识。</param>
-    /// <returns>字幕流列表。</returns>
     public async Task<List<ManagedEmbeddedSubtitleDto>> GetEmbeddedSubtitlesAsync(
         FileInfo mediaFile,
         CancellationToken cancellationToken,
@@ -67,13 +61,6 @@ public sealed class EmbeddedSubtitleService
     /// <summary>
     /// 用新下载的字幕替换当前分段中由插件写入的字幕流。
     /// </summary>
-    /// <param name="mediaFile">目标媒体文件。</param>
-    /// <param name="temporarySrtFile">临时 SRT 文件。</param>
-    /// <param name="candidateName">候选字幕名称。</param>
-    /// <param name="language">三字母语言码。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <param name="traceId">可选链路追踪标识。</param>
-    /// <returns>新写入的字幕流信息。</returns>
     public async Task<ManagedEmbeddedSubtitleDto> ReplacePluginManagedSubtitleAsync(
         FileInfo mediaFile,
         FileInfo temporarySrtFile,
@@ -101,11 +88,7 @@ public sealed class EmbeddedSubtitleService
         }
 
         var existingStreams = await GetEmbeddedSubtitlesAsync(mediaFile, cancellationToken, traceId).ConfigureAwait(false);
-        var pluginManagedStreams = existingStreams
-            .Where(stream => stream.IsPluginManaged)
-            .OrderBy(stream => stream.StreamIndex)
-            .ToList();
-
+        var pluginManagedStreams = existingStreams.Where(stream => stream.IsPluginManaged).OrderBy(stream => stream.StreamIndex).ToList();
         var keptSubtitleCount = existingStreams.Count - pluginManagedStreams.Count;
         var newSubtitleStreamIndex = keptSubtitleCount;
         var trackTitle = BuildPluginTrackTitle(candidateName);
@@ -123,6 +106,10 @@ public sealed class EmbeddedSubtitleService
                 "-i",
                 temporarySrtFile.FullName,
                 "-map",
+                "0",
+                "-map_metadata",
+                "0",
+                "-map_chapters",
                 "0"
             };
 
@@ -147,20 +134,14 @@ public sealed class EmbeddedSubtitleService
                 tempOutputPath
             ]);
 
-            await _ffmpegProcessService.RunFfmpegAsync(
-                arguments,
-                traceId,
-                "embed_subtitle_replace",
-                cancellationToken).ConfigureAwait(false);
+            await _ffmpegProcessService.RunFfmpegAsync(arguments, traceId, "embed_subtitle_replace", cancellationToken).ConfigureAwait(false);
 
             File.Delete(mediaFile.FullName);
             File.Move(tempOutputPath, mediaFile.FullName);
 
             var refreshedStreams = await GetEmbeddedSubtitlesAsync(mediaFile, cancellationToken, traceId).ConfigureAwait(false);
-            var createdStream = refreshedStreams
-                .LastOrDefault(stream => stream.IsPluginManaged && string.Equals(stream.Title, trackTitle, StringComparison.Ordinal))
+            return refreshedStreams.LastOrDefault(stream => stream.IsPluginManaged && string.Equals(stream.Title, trackTitle, StringComparison.Ordinal))
                 ?? throw new InvalidOperationException("内封字幕完成，但未能在输出文件中找到新字幕流。");
-            return createdStream;
         }
         finally
         {
@@ -174,11 +155,6 @@ public sealed class EmbeddedSubtitleService
     /// <summary>
     /// 删除当前媒体中由插件写入的一条字幕流。
     /// </summary>
-    /// <param name="mediaFile">目标媒体文件。</param>
-    /// <param name="streamIndex">待删除的绝对流索引。</param>
-    /// <param name="cancellationToken">取消令牌。</param>
-    /// <param name="traceId">可选链路追踪标识。</param>
-    /// <returns>异步任务。</returns>
     public async Task DeletePluginManagedSubtitleAsync(
         FileInfo mediaFile,
         int streamIndex,
@@ -224,6 +200,10 @@ public sealed class EmbeddedSubtitleService
                     "0",
                     "-map",
                     $"-0:{streamIndex}",
+                    "-map_metadata",
+                    "0",
+                    "-map_chapters",
+                    "0",
                     "-c",
                     "copy",
                     tempOutputPath
@@ -247,8 +227,6 @@ public sealed class EmbeddedSubtitleService
     /// <summary>
     /// 构建用于标记插件写入字幕轨的标题。
     /// </summary>
-    /// <param name="candidateName">原始字幕名称。</param>
-    /// <returns>可识别的字幕轨标题。</returns>
     public string BuildPluginTrackTitle(string candidateName)
     {
         ArgumentNullException.ThrowIfNull(candidateName);
@@ -264,14 +242,11 @@ public sealed class EmbeddedSubtitleService
 
     private static bool IsPluginManaged(string? title)
     {
-        return !string.IsNullOrWhiteSpace(title)
-            && title.StartsWith(PluginTrackTitlePrefix, StringComparison.Ordinal);
+        return !string.IsNullOrWhiteSpace(title) && title.StartsWith(PluginTrackTitlePrefix, StringComparison.Ordinal);
     }
 
     private static string NormalizeLanguage(string language)
     {
-        return string.IsNullOrWhiteSpace(language)
-            ? "und"
-            : language.Trim().ToLowerInvariant();
+        return string.IsNullOrWhiteSpace(language) ? "und" : language.Trim().ToLowerInvariant();
     }
 }
