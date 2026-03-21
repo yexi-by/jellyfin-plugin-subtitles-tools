@@ -10,12 +10,12 @@
     "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
     "versions": [
       {
-        "version": "0.5.3.0",
+        "version": "0.6.0.0",
         "changelog": "修复配置页底部 FFmpeg 路径输入区域的显示冲突，并继续演进内封字幕工作流。",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.5.3.0/Jellyfin.Plugin.SubtitlesTools_0.5.3.0.zip",
-        "checksum": "93E7E50DFE048520174E44351DFC6293",
-        "timestamp": "2026-03-21T12:16:21Z"
+        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.6.0.0/Jellyfin.Plugin.SubtitlesTools_0.6.0.0.zip",
+        "checksum": "30CC857443431961EB20E5613F07B70A",
+        "timestamp": "2026-03-21T15:12:22Z"
       }
     ]
   }
