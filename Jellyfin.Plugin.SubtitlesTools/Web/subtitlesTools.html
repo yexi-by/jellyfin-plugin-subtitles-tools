@@ -1,11 +1,9 @@
 <div id="SubtitlesToolsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-controller="__plugin/subtitlesToolsjsv2">
     <style>
-        #SubtitlesToolsConfigForm {
-            padding-bottom: 9rem;
-        }
-
         #SubtitlesToolsConfigPage .subtitlesToolsConfigFooter {
             background: var(--theme-body-background, #101010);
+            margin-top: 2rem;
+            gap: 1rem;
         }
     </style>
     <div data-role="content">
@@ -78,7 +76,7 @@
 
                 <div class="fieldDescription" id="testConnectionMessage"></div>
 
-                <div class="formDialogFooter flex align-items-center subtitlesToolsConfigFooter">
+                <div class="flex align-items-center subtitlesToolsConfigFooter">
                     <button id="testConnectionButton" is="emby-button" type="button" class="raised button-cancel">
                         <span>测试连接</span>
                     </button>
