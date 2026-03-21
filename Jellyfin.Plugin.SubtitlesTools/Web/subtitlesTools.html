@@ -18,6 +18,9 @@
                         插件现在只认视频自身的 MKV 元数据来判断是否已纳管，并统一走“确保纳管 -> 迅雷搜字幕 -> 转 UTF-8 SRT -> 软字幕内封到 MKV”的流程。
                     </div>
                     <div class="fieldDescription">
+                        历史影片可通过 Jellyfin 计划任务“<strong>一键算 CID/GCID 并转换为 MKV</strong>”统一处理；任务会扫描整个媒体库，但只处理未纳管影片。
+                    </div>
+                    <div class="fieldDescription">
                         Python 服务端项目：
                         <a is="emby-linkbutton" class="button-link" target="_blank" href="https://github.com/yexi-by/subtitles-tools">https://github.com/yexi-by/subtitles-tools</a>
                     </div>
