@@ -4,6 +4,10 @@ import { ConfigPageApp } from './App';
 const roots = new WeakMap<Element, Root>();
 const initializedViews = new WeakSet<Element>();
 
+function renderConfigPage(root: Root): void {
+  root.render(<ConfigPageApp />);
+}
+
 function ensureHost(view: Element): HTMLElement {
   const existingHost = view.querySelector<HTMLElement>('#SubtitlesToolsConfigReactRoot');
   if (existingHost) {
@@ -26,8 +30,10 @@ export default function subtitlesToolsConfigController(view: Element): void {
   if (!initializedViews.has(view)) {
     const currentRoot = root;
     view.addEventListener('viewshow', () => {
-      currentRoot.render(<ConfigPageApp />);
+      renderConfigPage(currentRoot);
     });
     initializedViews.add(view);
   }
+
+  renderConfigPage(root);
 }

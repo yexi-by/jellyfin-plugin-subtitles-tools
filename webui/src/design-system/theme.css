@@ -1,4 +1,5 @@
-@import "tailwindcss" prefix(st);
+@import "tailwindcss";
+@source "../";
 
 @theme {
   --font-sans: "Segoe UI Variable Text", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;

@@ -86,9 +86,10 @@ public sealed class FfmpegProcessService
             [
                 "-v",
                 "error",
+                // 这里只保留 show_entries 和 show_streams，避免 Windows 下 ffprobe 额外回传
+                // filename 时把反斜杠路径写进 JSON，进而触发反序列化失败。
                 "-show_entries",
                 "format=format_name,format_long_name:stream=index,codec_type,codec_name,codec_long_name,profile,codec_tag_string,width,height,pix_fmt",
-                "-show_format",
                 "-show_streams",
                 "-print_format",
                 "json",

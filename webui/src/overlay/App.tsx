@@ -37,34 +37,34 @@ function CurrentPartCard({ part }: { part: MediaPart | null }): JSX.Element {
   const partNumber = part.PartNumber !== null && part.PartNumber !== undefined ? `第 ${part.PartNumber} 段` : '未编号';
 
   return (
-    <article className="st-grid st-gap-4 st-rounded-shell-lg st-border st-border-white/8 st-bg-[linear-gradient(145deg,rgba(243,241,236,0.04),rgba(80,119,154,0.08))] st-p-5">
-      <div className="st-flex st-flex-wrap st-items-start st-justify-between st-gap-3">
-        <div className="st-grid st-gap-2">
-          <span className="st-text-[0.72rem] st-font-bold st-uppercase st-tracking-[0.14em] st-text-shell-text/62">{part.Label}</span>
-          <h4 className="st-break-all st-text-lg st-font-semibold st-leading-7 st-text-shell-text">{part.FileName || getFileNameFromPath(part.MediaPath)}</h4>
-          <p className="st-text-sm st-leading-7 st-text-shell-text-soft">插件会优先完成纳管与兼容性判断，再决定是否继续搜索字幕与内封。</p>
+    <article className="grid gap-4 rounded-shell-lg border border-white/8 bg-[linear-gradient(145deg,rgba(243,241,236,0.04),rgba(80,119,154,0.08))] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-2">
+          <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-shell-text/62">{part.Label}</span>
+          <h4 className="break-all text-lg font-semibold leading-7 text-shell-text">{part.FileName || getFileNameFromPath(part.MediaPath)}</h4>
+          <p className="text-sm leading-7 text-shell-text-soft">插件会优先完成纳管与兼容性判断，再决定是否继续搜索字幕与内封。</p>
         </div>
-        <div className="st-flex st-flex-wrap st-gap-2">
+        <div className="flex flex-wrap gap-2">
           <Badge>{(part.Container || 'unknown').toUpperCase()}</Badge>
           <Badge tone={getManagedStatusTone(part)}>{getManagedStatusText(part)}</Badge>
           <Badge tone={getCompatibilityTone(part)}>{getCompatibilityStatusText(part)}</Badge>
           <Badge tone={part.Pipeline ? 'accent' : 'neutral'}>{pipeline}</Badge>
         </div>
       </div>
-      <div className="st-grid st-gap-3 md:st-grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         {[
           ['分段类型', part.PartKind || '未标记'],
           ['分段编号', partNumber],
           ['媒体路径', part.MediaPath || '未返回路径'],
           ['当前流水线', pipeline]
         ].map(([label, value]) => (
-          <div key={label} className="st-grid st-gap-1.5 st-rounded-shell-sm st-border st-border-white/8 st-bg-white/4 st-p-3.5">
-            <span className="st-text-xs st-text-shell-text/62">{label}</span>
-            <strong className="st-break-all st-text-sm st-leading-6 st-text-shell-text">{value}</strong>
+          <div key={label} className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
+            <span className="text-xs text-shell-text/62">{label}</span>
+            <strong className="break-all text-sm leading-6 text-shell-text">{value}</strong>
           </div>
         ))}
       </div>
-      <p className="st-text-sm st-leading-7 st-text-shell-text-soft">当前插件只根据视频自身的 MKV 元数据判断是否已纳管。若分段仍命中高风险硬解规则，建议优先执行 MKV 转换修复。</p>
+      <p className="text-sm leading-7 text-shell-text-soft">当前插件只根据视频自身的 MKV 元数据判断是否已纳管。若分段仍命中高风险硬解规则，建议优先执行 MKV 转换修复。</p>
     </article>
   );
 }
@@ -82,33 +82,33 @@ function EmbeddedSubtitleList({
   }
 
   return (
-    <div className="st-grid st-gap-3">
+    <div className="grid gap-3">
       {tracks.map(track => (
-        <article key={track.StreamIndex} className="st-grid st-gap-4 st-rounded-shell-lg st-border st-border-white/8 st-bg-white/4 st-p-5">
-          <div className="st-flex st-flex-wrap st-items-start st-justify-between st-gap-3">
-            <div className="st-grid st-gap-2">
-              <span className="st-text-[0.72rem] st-font-bold st-uppercase st-tracking-[0.14em] st-text-shell-text/62">字幕流 #{track.StreamIndex}</span>
-              <h4 className="st-text-lg st-font-semibold st-text-shell-text">{track.Title || `字幕流 #${track.StreamIndex}`}</h4>
-              <p className="st-text-sm st-leading-7 st-text-shell-text-soft">这条字幕轨已经存在于当前分段的 MKV 容器中。</p>
+        <article key={track.StreamIndex} className="grid gap-4 rounded-shell-lg border border-white/8 bg-white/4 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="grid gap-2">
+              <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-shell-text/62">字幕流 #{track.StreamIndex}</span>
+              <h4 className="text-lg font-semibold text-shell-text">{track.Title || `字幕流 #${track.StreamIndex}`}</h4>
+              <p className="text-sm leading-7 text-shell-text-soft">这条字幕轨已经存在于当前分段的 MKV 容器中。</p>
             </div>
-            <div className="st-flex st-flex-wrap st-gap-2">
+            <div className="flex flex-wrap gap-2">
               <Badge tone={track.IsPluginManaged ? 'success' : 'neutral'}>{track.IsPluginManaged ? '插件写入' : '现有轨道'}</Badge>
               <Badge>{track.Language || 'und'}</Badge>
               <Badge tone="accent">{(track.Format || 'srt').toUpperCase()}</Badge>
             </div>
           </div>
-          <div className="st-grid st-gap-3 md:st-grid-cols-2">
-            <div className="st-grid st-gap-1.5 st-rounded-shell-sm st-border st-border-white/8 st-bg-white/4 st-p-3.5">
-              <span className="st-text-xs st-text-shell-text/62">绝对流索引</span>
-              <strong className="st-text-sm st-text-shell-text">{track.StreamIndex}</strong>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
+              <span className="text-xs text-shell-text/62">绝对流索引</span>
+              <strong className="text-sm text-shell-text">{track.StreamIndex}</strong>
             </div>
-            <div className="st-grid st-gap-1.5 st-rounded-shell-sm st-border st-border-white/8 st-bg-white/4 st-p-3.5">
-              <span className="st-text-xs st-text-shell-text/62">字幕流序号</span>
-              <strong className="st-text-sm st-text-shell-text">{track.SubtitleStreamIndex ?? '未返回'}</strong>
+            <div className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
+              <span className="text-xs text-shell-text/62">字幕流序号</span>
+              <strong className="text-sm text-shell-text">{track.SubtitleStreamIndex ?? '未返回'}</strong>
             </div>
           </div>
           {track.IsPluginManaged ? (
-            <div className="st-flex st-flex-wrap st-gap-3">
+            <div className="flex flex-wrap gap-3">
               <Button type="button" variant="danger" onClick={() => void onDelete(track.StreamIndex)}>
                 删除这条内封字幕
               </Button>
@@ -132,38 +132,38 @@ function CandidateList({
   }
 
   return (
-    <div className="st-grid st-gap-3">
+    <div className="grid gap-3">
       {candidates.map(candidate => {
         const languages = candidate.Languages?.length ? candidate.Languages.join(' / ') : candidate.Language || 'und';
         const fingerprintScore = Number.isFinite(candidate.FingerprintScore) ? candidate.FingerprintScore!.toFixed(2) : '-';
 
         return (
-          <article key={candidate.Id} className="st-grid st-gap-4 st-rounded-shell-lg st-border st-border-white/8 st-bg-white/4 st-p-5">
-            <div className="st-flex st-flex-wrap st-items-start st-justify-between st-gap-4">
-              <div className="st-grid st-gap-2">
-                <span className="st-text-[0.72rem] st-font-bold st-uppercase st-tracking-[0.14em] st-text-shell-text/62">候选字幕</span>
-                <h4 className="st-text-lg st-font-semibold st-leading-7 st-text-shell-text">{candidate.DisplayName || candidate.Name || '未命名候选字幕'}</h4>
-                <p className="st-text-sm st-leading-7 st-text-shell-text-soft">候选项会先转为 UTF-8 SRT，再内封到当前分段对应的 MKV 文件。</p>
+          <article key={candidate.Id} className="grid gap-4 rounded-shell-lg border border-white/8 bg-white/4 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="grid gap-2">
+                <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-shell-text/62">候选字幕</span>
+                <h4 className="text-lg font-semibold leading-7 text-shell-text">{candidate.DisplayName || candidate.Name || '未命名候选字幕'}</h4>
+                <p className="text-sm leading-7 text-shell-text-soft">候选项会先转为 UTF-8 SRT，再内封到当前分段对应的 MKV 文件。</p>
               </div>
-              <div className="st-grid st-place-items-center st-rounded-shell-lg st-bg-[linear-gradient(145deg,rgba(208,108,77,0.18),rgba(80,119,154,0.18))] st-px-4 st-py-3 st-text-center st-text-shell-text">
-                <strong className="st-text-2xl st-leading-none">{candidate.Score ?? '-'}</strong>
-                <span className="st-mt-1 st-text-[0.68rem] st-font-bold st-uppercase st-tracking-[0.12em] st-text-shell-text/70">匹配分</span>
+              <div className="grid place-items-center rounded-shell-lg bg-[linear-gradient(145deg,rgba(208,108,77,0.18),rgba(80,119,154,0.18))] px-4 py-3 text-center text-shell-text">
+                <strong className="text-2xl leading-none">{candidate.Score ?? '-'}</strong>
+                <span className="mt-1 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-shell-text/70">匹配分</span>
               </div>
             </div>
-            <div className="st-grid st-gap-3 md:st-grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2">
               {[
                 ['语言', languages],
                 ['格式', (candidate.Format || candidate.Ext || 'srt').toUpperCase()],
                 ['指纹分', fingerprintScore],
                 ['临时文件', candidate.TemporarySrtFileName || '未返回']
               ].map(([label, value]) => (
-                <div key={label} className="st-grid st-gap-1.5 st-rounded-shell-sm st-border st-border-white/8 st-bg-white/4 st-p-3.5">
-                  <span className="st-text-xs st-text-shell-text/62">{label}</span>
-                  <strong className="st-break-all st-text-sm st-leading-6 st-text-shell-text">{value}</strong>
+                <div key={label} className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
+                  <span className="text-xs text-shell-text/62">{label}</span>
+                  <strong className="break-all text-sm leading-6 text-shell-text">{value}</strong>
                 </div>
               ))}
             </div>
-            <div className="st-flex st-flex-wrap st-gap-3">
+            <div className="flex flex-wrap gap-3">
               <Button type="button" variant="primary" onClick={() => void onDownload(candidate.Id)}>
                 下载并内封到当前分段
               </Button>
@@ -181,33 +181,33 @@ function BatchSummary({ items }: { items: OperationResultItem[] }): JSX.Element 
   }
 
   return (
-    <section className="st-grid st-gap-4">
+    <section className="grid gap-4">
       <SectionHeading title="最近一次整组任务" description="这里保留最近一次整组转换或一键最佳匹配任务的结果，方便快速核对每个分段的处理状态。" />
-      <div className="st-grid st-gap-3">
+      <div className="grid gap-3">
         {items.map(item => (
           <article
             key={`${item.PartId ?? 'unknown'}-${item.Status ?? 'unknown'}`}
             className={cx(
-              'st-grid st-gap-4 st-rounded-shell-lg st-border st-p-5',
-              getBatchTone(item.Status) === 'success' && 'st-border-shell-success/35 st-bg-[linear-gradient(145deg,rgba(109,177,140,0.18),rgba(243,241,236,0.03))]',
-              getBatchTone(item.Status) === 'warning' && 'st-border-shell-warning/35 st-bg-[linear-gradient(145deg,rgba(216,170,100,0.18),rgba(243,241,236,0.03))]',
-              getBatchTone(item.Status) === 'danger' && 'st-border-shell-danger/35 st-bg-[linear-gradient(145deg,rgba(212,122,114,0.18),rgba(243,241,236,0.03))]',
-              getBatchTone(item.Status) === 'neutral' && 'st-border-white/8 st-bg-white/4'
+              'grid gap-4 rounded-shell-lg border p-5',
+              getBatchTone(item.Status) === 'success' && 'border-shell-success/35 bg-[linear-gradient(145deg,rgba(109,177,140,0.18),rgba(243,241,236,0.03))]',
+              getBatchTone(item.Status) === 'warning' && 'border-shell-warning/35 bg-[linear-gradient(145deg,rgba(216,170,100,0.18),rgba(243,241,236,0.03))]',
+              getBatchTone(item.Status) === 'danger' && 'border-shell-danger/35 bg-[linear-gradient(145deg,rgba(212,122,114,0.18),rgba(243,241,236,0.03))]',
+              getBatchTone(item.Status) === 'neutral' && 'border-white/8 bg-white/4'
             )}
           >
-            <div className="st-flex st-flex-wrap st-items-start st-justify-between st-gap-3">
-              <div className="st-grid st-gap-2">
-                <strong className="st-text-base st-font-semibold st-text-shell-text">{item.Label || '未命名分段'}</strong>
-                <span className="st-text-sm st-leading-7 st-text-shell-text-soft">{item.Message || '未返回处理信息。'}</span>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="grid gap-2">
+                <strong className="text-base font-semibold text-shell-text">{item.Label || '未命名分段'}</strong>
+                <span className="text-sm leading-7 text-shell-text-soft">{item.Message || '未返回处理信息。'}</span>
               </div>
               <Badge tone={getBatchTone(item.Status)}>{getBatchStatusText(item.Status)}</Badge>
             </div>
-            <div className="st-flex st-flex-wrap st-gap-2">
+            <div className="flex flex-wrap gap-2">
               {item.Container ? <Badge>{item.Container.toUpperCase()}</Badge> : null}
               {item.Pipeline ? <Badge tone="accent">{item.Pipeline}</Badge> : null}
               {item.RiskVerdict ? <Badge tone={item.NeedsCompatibilityRepair ? 'danger' : 'warning'}>{item.NeedsCompatibilityRepair ? `${item.RiskVerdict}（需修复）` : item.RiskVerdict}</Badge> : null}
             </div>
-            {item.MediaPath ? <div className="st-break-all st-text-xs st-leading-6 st-text-shell-text-faint">{item.MediaPath}</div> : null}
+            {item.MediaPath ? <div className="break-all text-xs leading-6 text-shell-text-faint">{item.MediaPath}</div> : null}
           </article>
         ))}
       </div>
@@ -229,25 +229,25 @@ function PartNavigation({
   }
 
   return (
-    <div className="st-grid st-gap-3">
+    <div className="grid gap-3">
       {parts.map(part => (
         <button
           key={part.Id}
           className={cx(
-            'st-grid st-gap-3 st-rounded-shell-md st-border st-border-white/8 st-bg-white/4 st-p-4 st-text-left st-transition hover:st--translate-y-0.5',
-            activePartId === part.Id && 'st-border-shell-accent/35 st-bg-[linear-gradient(145deg,rgba(208,108,77,0.16),rgba(80,119,154,0.14))]'
+            'grid gap-3 rounded-shell-md border border-white/8 bg-white/4 p-4 text-left transition hover:-translate-y-0.5',
+            activePartId === part.Id && 'border-shell-accent/35 bg-[linear-gradient(145deg,rgba(208,108,77,0.16),rgba(80,119,154,0.14))]'
           )}
           type="button"
           onClick={() => onSelect(part.Id)}
         >
-          <div className="st-flex st-flex-wrap st-items-start st-justify-between st-gap-3">
-            <div className="st-grid st-gap-1">
-              <strong className="st-text-sm st-font-semibold st-text-shell-text">{part.Label}</strong>
-              <span className="st-break-all st-text-xs st-leading-6 st-text-shell-text-faint">{part.FileName || getFileNameFromPath(part.MediaPath)}</span>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="grid gap-1">
+              <strong className="text-sm font-semibold text-shell-text">{part.Label}</strong>
+              <span className="break-all text-xs leading-6 text-shell-text-faint">{part.FileName || getFileNameFromPath(part.MediaPath)}</span>
             </div>
-            <span className="st-inline-flex st-h-8 st-min-w-8 st-items-center st-justify-center st-rounded-full st-bg-white/8 st-px-2 st-text-xs st-font-bold st-text-shell-text/82">#{part.Index}</span>
+            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-white/8 px-2 text-xs font-bold text-shell-text/82">#{part.Index}</span>
           </div>
-          <div className="st-flex st-flex-wrap st-gap-2">
+          <div className="flex flex-wrap gap-2">
             <Badge>{(part.Container || 'unknown').toUpperCase()}</Badge>
             <Badge tone={getManagedStatusTone(part)}>{getManagedStatusText(part)}</Badge>
             <Badge tone={getCompatibilityTone(part)}>{getCompatibilityStatusText(part)}</Badge>
@@ -272,8 +272,8 @@ export function OverlayApp({
   return (
     <div
       className={cx(
-        'st-fixed st-inset-0 st-z-[100000] st-hidden st-bg-[radial-gradient(circle_at_top_right,rgba(208,108,77,0.18),transparent_30%),radial-gradient(circle_at_top_left,rgba(80,119,154,0.18),transparent_28%),rgba(7,10,15,0.82)] st-p-3 st-backdrop-blur-md lg:st-p-6',
-        state.isOverlayOpen && 'st-flex st-items-center st-justify-center'
+        'fixed inset-0 z-[100000] hidden bg-[radial-gradient(circle_at_top_right,rgba(208,108,77,0.18),transparent_30%),radial-gradient(circle_at_top_left,rgba(80,119,154,0.18),transparent_28%),rgba(7,10,15,0.82)] p-3 backdrop-blur-md lg:p-6',
+        state.isOverlayOpen && 'flex items-center justify-center'
       )}
       onClick={event => {
         if (event.target === event.currentTarget) {
@@ -281,47 +281,47 @@ export function OverlayApp({
         }
       }}
     >
-      <div className="st-grid st-h-full st-w-full st-max-w-[1280px] st-grid-rows-[auto_auto_auto_minmax(0,1fr)] st-overflow-hidden st-rounded-none st-border st-border-shell-border st-bg-[linear-gradient(180deg,rgba(18,23,32,0.98),rgba(15,20,27,0.98))] st-shadow-shell-strong sm:st-max-h-[calc(100vh-24px)] sm:st-rounded-shell-xl lg:st-max-h-[calc(100vh-48px)]">
-        <header className="st-relative st-grid st-gap-5 st-border-b st-border-shell-border st-p-4 md:st-grid-cols-[minmax(0,1.2fr)_minmax(16rem,0.8fr)] md:st-px-8 md:st-py-7">
-          <div className="st-absolute st-right-[-7rem] st-top-[-8rem] st-h-72 st-w-72 st-rounded-full st-bg-[radial-gradient(circle,rgba(208,108,77,0.24),transparent_72%)]" />
-          <div className="st-absolute st-bottom-[-10rem] st-left-[-7rem] st-h-80 st-w-80 st-rounded-full st-bg-[radial-gradient(circle,rgba(80,119,154,0.2),transparent_74%)]" />
-          <div className="st-relative st-grid st-gap-4">
-            <div className="st-inline-flex st-items-center st-gap-2 st-text-[0.72rem] st-font-bold st-uppercase st-tracking-[0.18em] st-text-shell-text/68">Subtitles Tools 控制台</div>
-            <h2 className="st-font-serif st-text-[clamp(2rem,2.6vw,2.9rem)] st-leading-[1.04] st-text-shell-text">{state.itemData?.Name || '未命名媒体'}</h2>
-            <p className="st-max-w-[42rem] st-text-sm st-leading-8 st-text-shell-text-soft">{state.itemData?.ItemType || '媒体项目'} · {state.itemData?.IsMultipart ? '多分段媒体' : '单文件媒体'}。当前弹层用于分段纳管、字幕搜索、字幕内封与整组任务复核。</p>
-            <div className="st-flex st-flex-wrap st-gap-2">
+      <div className="grid h-full w-full max-w-[1280px] grid-rows-[auto_auto_auto_minmax(0,1fr)] overflow-hidden rounded-none border border-shell-border bg-[linear-gradient(180deg,rgba(18,23,32,0.98),rgba(15,20,27,0.98))] shadow-shell-strong sm:max-h-[calc(100vh-24px)] sm:rounded-shell-xl lg:max-h-[calc(100vh-48px)]">
+        <header className="relative grid gap-5 border-b border-shell-border p-4 md:grid-cols-[minmax(0,1.2fr)_minmax(16rem,0.8fr)] md:px-8 md:py-7">
+          <div className="absolute right-[-7rem] top-[-8rem] h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(208,108,77,0.24),transparent_72%)]" />
+          <div className="absolute bottom-[-10rem] left-[-7rem] h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(80,119,154,0.2),transparent_74%)]" />
+          <div className="relative grid gap-4">
+            <div className="inline-flex items-center gap-2 text-[0.72rem] font-bold uppercase tracking-[0.18em] text-shell-text/68">Subtitles Tools 控制台</div>
+            <h2 className="font-serif text-[clamp(2rem,2.6vw,2.9rem)] leading-[1.04] text-shell-text">{state.itemData?.Name || '未命名媒体'}</h2>
+            <p className="max-w-[42rem] text-sm leading-8 text-shell-text-soft">{state.itemData?.ItemType || '媒体项目'} · {state.itemData?.IsMultipart ? '多分段媒体' : '单文件媒体'}。当前弹层用于分段纳管、字幕搜索、字幕内封与整组任务复核。</p>
+            <div className="flex flex-wrap gap-2">
               <Badge tone="accent">{state.itemData?.IsMultipart ? '多分段媒体' : '单文件媒体'}</Badge>
               {headerSummary.map(item => <Badge key={item}>{item}</Badge>)}
             </div>
           </div>
-          <div className="st-relative st-grid st-content-start st-justify-items-end st-gap-3">
+          <div className="relative grid content-start justify-items-end gap-3">
             <button
               aria-label="关闭字幕控制台"
-              className="st-inline-flex st-h-11 st-w-11 st-items-center st-justify-center st-rounded-full st-border st-border-white/12 st-bg-white/5 st-text-2xl st-text-shell-text st-transition hover:st-rotate-90 hover:st-bg-white/9 disabled:st-cursor-not-allowed disabled:st-opacity-60"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/5 text-2xl text-shell-text transition hover:rotate-90 hover:bg-white/9 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={state.busy}
               type="button"
               onClick={actions.closeOverlay}
             >
               ×
             </button>
-            <div className="st-w-full st-max-w-[20rem] st-rounded-shell-md st-border st-border-white/8 st-bg-white/4 st-p-4 st-text-sm st-leading-7 st-text-shell-text-soft">
+            <div className="w-full max-w-[20rem] rounded-shell-md border border-white/8 bg-white/4 p-4 text-sm leading-7 text-shell-text-soft">
               这套控制台遵循“先纳管与兼容修复，再搜索和内封”的顺序。若当前分段仍被标记为高风险，建议优先执行 MKV 转换。
             </div>
           </div>
         </header>
 
-        <section className="st-grid st-gap-3 st-border-b st-border-shell-border st-p-4 md:st-grid-cols-2 xl:st-grid-cols-4 md:st-px-8 md:st-py-5">
+        <section className="grid gap-3 border-b border-shell-border p-4 md:grid-cols-2 xl:grid-cols-4 md:px-8 md:py-5">
           {(state.itemData ? getItemMetrics(state.itemData) : []).map(metric => <MetricCard key={metric.label} metric={metric} />)}
         </section>
 
-        <section className="st-grid st-gap-4 st-border-b st-border-shell-border st-p-4 md:st-px-8 md:st-py-5">
+        <section className="grid gap-4 border-b border-shell-border p-4 md:px-8 md:py-5">
           <StatusBanner
             label={getStatusLabel(state.statusTone)}
             message={state.statusMessage || '选择左侧分段后，即可开始搜索、转换和内封操作。'}
             title={getStatusTitle(state.statusTone)}
             tone={state.statusTone}
           />
-          <div className="st-grid st-gap-3 md:st-grid-cols-2 xl:st-grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <Button disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.refresh()}>刷新分段状态</Button>
             <Button disabled={state.busy || !activePart} type="button" variant="tertiary" onClick={() => void actions.searchCurrentPart()}>搜索当前分段</Button>
             <Button disabled={state.busy || !activePart} type="button" variant="secondary" onClick={() => void actions.convertCurrentPart()}>转换当前分段为 MKV</Button>
@@ -330,29 +330,29 @@ export function OverlayApp({
           </div>
         </section>
 
-        <div className="st-grid st-min-h-0 lg:st-grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)]">
-          <aside className="st-grid st-min-h-0 st-grid-rows-[auto_minmax(0,1fr)] st-border-b st-border-shell-border st-bg-white/2 lg:st-border-b-0 lg:st-border-r">
-            <div className="st-grid st-gap-2 st-border-b st-border-white/6 st-p-4 md:st-px-6 md:st-py-5">
-              <h3 className="st-font-serif st-text-[1.55rem] st-leading-tight st-text-shell-text">分段导航</h3>
-              <p className="st-text-sm st-leading-7 st-text-shell-text-soft">左侧显示分段容器、纳管状态与兼容性状态。先选择分段，再执行搜索、转换或单段内封。</p>
+        <div className="grid min-h-0 lg:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)]">
+          <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] border-b border-shell-border bg-white/2 lg:border-b-0 lg:border-r">
+            <div className="grid gap-2 border-b border-white/6 p-4 md:px-6 md:py-5">
+              <h3 className="font-serif text-[1.55rem] leading-tight text-shell-text">分段导航</h3>
+              <p className="text-sm leading-7 text-shell-text-soft">左侧显示分段容器、纳管状态与兼容性状态。先选择分段，再执行搜索、转换或单段内封。</p>
             </div>
-            <div className="st-grid st-content-start st-gap-3 st-overflow-y-auto st-p-4 md:st-px-6 md:st-py-4">
+            <div className="grid content-start gap-3 overflow-y-auto p-4 md:px-6 md:py-4">
               <PartNavigation activePartId={state.activePartId} onSelect={actions.selectPart} parts={state.itemData?.Parts ?? []} />
             </div>
           </aside>
 
-          <main className="st-grid st-min-h-0 st-content-start st-gap-5 st-overflow-y-auto st-p-4 md:st-px-8 md:st-py-6">
-            <section className="st-grid st-gap-4">
+          <main className="grid min-h-0 content-start gap-5 overflow-y-auto p-4 md:px-8 md:py-6">
+            <section className="grid gap-4">
               <SectionHeading title="当前分段概览" description="这里聚焦当前分段的纳管状态、兼容性判断、路径与流水线信息，用来决定下一步操作。" />
               <CurrentPartCard part={activePart} />
             </section>
 
-            <section className="st-grid st-gap-4">
+            <section className="grid gap-4">
               <SectionHeading title="当前已内封字幕流" description="区分插件写入轨道与原有轨道。只有插件写入的字幕流会显示删除按钮。" />
               <EmbeddedSubtitleList onDelete={actions.deleteEmbeddedSubtitle} part={activePart} />
             </section>
 
-            <section className="st-grid st-gap-4">
+            <section className="grid gap-4">
               <SectionHeading title="搜索结果" description="候选字幕按匹配质量展示。下载时会先转换为 UTF-8 SRT，再内封到当前分段。" />
               <CandidateList candidates={activeCandidates} onDownload={actions.downloadCandidate} />
             </section>
@@ -373,14 +373,14 @@ export function FloatingButton({
   visible: boolean;
 }): JSX.Element {
   return (
-    <div className={cx('st-fixed st-bottom-6 st-right-6 st-z-[99999] st-translate-y-3 st-opacity-0 st-transition lg:st-bottom-8 lg:st-right-8', visible && 'st-translate-y-0 st-opacity-100')}>
+    <div className={cx('fixed bottom-6 right-6 z-[99999] translate-y-3 opacity-0 transition lg:bottom-8 lg:right-8', visible && 'translate-y-0 opacity-100')}>
       <button
-        className="st-grid st-min-w-[9.75rem] st-gap-1 st-rounded-[1.25rem] st-border st-border-white/8 st-bg-[linear-gradient(140deg,rgba(208,108,77,0.94),rgba(142,63,47,0.98))] st-px-5 st-py-4 st-text-left st-text-[rgb(255,248,244)] st-shadow-[0_18px_38px_rgba(10,13,20,0.38)] st-transition hover:st--translate-y-0.5"
+        className="grid min-w-[9.75rem] gap-1 rounded-[1.25rem] border border-white/8 bg-[linear-gradient(140deg,rgba(208,108,77,0.94),rgba(142,63,47,0.98))] px-5 py-4 text-left text-[rgb(255,248,244)] shadow-[0_18px_38px_rgba(10,13,20,0.38)] transition hover:-translate-y-0.5"
         type="button"
         onClick={onOpen}
       >
-        <span className="st-text-sm st-font-bold st-tracking-[0.04em]">字幕控制台</span>
-        <span className="st-text-[0.68rem] st-font-semibold st-uppercase st-tracking-[0.14em] st-text-[rgba(255,248,244,0.74)]">搜索 · 转换 · 内封</span>
+        <span className="text-sm font-bold tracking-[0.04em]">字幕控制台</span>
+        <span className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[rgba(255,248,244,0.74)]">搜索 · 转换 · 内封</span>
       </button>
     </div>
   );

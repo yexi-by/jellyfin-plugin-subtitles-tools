@@ -1,5 +1,6 @@
 import { API_ROOT, REFRESH_RETRY_ATTEMPTS, REFRESH_RETRY_DELAY_MS } from '../shared/constants';
 import { getCurrentItemId, sleep } from '../shared/dom';
+import { extractErrorMessage } from '../shared/errors';
 import { requestJson } from '../shared/runtime';
 import type {
   ItemPartsPayload,
@@ -132,10 +133,15 @@ export async function refreshCurrentPageState(forceReload: boolean): Promise<voi
   try {
     await fetchParts(itemId, forceReload);
     patchOverlayState({ isFabVisible: true });
-  } catch {
+  } catch (error) {
     replaceOverlayState({
       ...initialState,
-      lastLocation: locationSignature
+      isFabVisible: true,
+      isOverlayOpen: state.isOverlayOpen,
+      itemId,
+      lastLocation: locationSignature,
+      statusMessage: extractErrorMessage(error),
+      statusTone: 'error'
     });
   }
 }

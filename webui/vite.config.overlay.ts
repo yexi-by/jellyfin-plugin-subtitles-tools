@@ -5,6 +5,9 @@ import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production')
+  },
   plugins: [
     react(),
     tailwindcss(),
