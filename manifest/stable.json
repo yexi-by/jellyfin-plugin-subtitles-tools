@@ -10,10 +10,10 @@
     "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
     "versions": [
       {
-        "version": "0.7.1.1",
-        "changelog": "修复 React 工具链版 WebUI 在 Jellyfin 中的首屏渲染与样式失效问题；修复部分 Windows 路径媒体在字幕控制台加载时 `/parts` 接口返回 500 的问题；当前端暂时拿不到分段数据时，详情页会保留字幕控制台入口并显示错误状态，避免页面完全无按钮。",
+        "version": "0.7.1.2",
+        "changelog": "重构字幕控制台的响应式布局，修复平板访问时内容被顶部信息区挤压导致无法操作的问题；补齐手机和平板在横屏、竖屏下的滚动、分段导航、主操作按钮与安全区适配；保持桌面布局不变，同时让小屏设备优先露出可操作区域。",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.1.1/Jellyfin.Plugin.SubtitlesTools_0.7.1.1.zip",
+        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.1.2/Jellyfin.Plugin.SubtitlesTools_0.7.1.2.zip",
         "checksum": "E14A2B98CF6093AA665772338578F5EA",
         "timestamp": "2026-03-22T18:03:26Z"
       }

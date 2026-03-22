@@ -51,7 +51,7 @@ function CurrentPartCard({ part }: { part: MediaPart | null }): JSX.Element {
           <Badge tone={part.Pipeline ? 'accent' : 'neutral'}>{pipeline}</Badge>
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         {[
           ['分段类型', part.PartKind || '未标记'],
           ['分段编号', partNumber],
@@ -97,7 +97,7 @@ function EmbeddedSubtitleList({
               <Badge tone="accent">{(track.Format || 'srt').toUpperCase()}</Badge>
             </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
               <span className="text-xs text-shell-text/62">绝对流索引</span>
               <strong className="text-sm text-shell-text">{track.StreamIndex}</strong>
@@ -150,7 +150,7 @@ function CandidateList({
                 <span className="mt-1 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-shell-text/70">匹配分</span>
               </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {[
                 ['语言', languages],
                 ['格式', (candidate.Format || candidate.Ext || 'srt').toUpperCase()],
@@ -229,12 +229,12 @@ function PartNavigation({
   }
 
   return (
-    <div className="grid gap-3">
+    <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 xl:grid xl:gap-3 xl:overflow-x-visible xl:pb-0">
       {parts.map(part => (
         <button
           key={part.Id}
           className={cx(
-            'grid gap-3 rounded-shell-md border border-white/8 bg-white/4 p-4 text-left transition hover:-translate-y-0.5',
+            'grid min-w-[14rem] shrink-0 snap-start gap-3 rounded-shell-md border border-white/8 bg-white/4 p-4 text-left transition hover:-translate-y-0.5 sm:min-w-[15rem] xl:min-w-0 xl:w-full',
             activePartId === part.Id && 'border-shell-accent/35 bg-[linear-gradient(145deg,rgba(208,108,77,0.16),rgba(80,119,154,0.14))]'
           )}
           type="button"
@@ -272,8 +272,8 @@ export function OverlayApp({
   return (
     <div
       className={cx(
-        'fixed inset-0 z-[100000] hidden bg-[radial-gradient(circle_at_top_right,rgba(208,108,77,0.18),transparent_30%),radial-gradient(circle_at_top_left,rgba(80,119,154,0.18),transparent_28%),rgba(7,10,15,0.82)] p-3 backdrop-blur-md lg:p-6',
-        state.isOverlayOpen && 'flex items-center justify-center'
+        'fixed inset-0 z-[100000] hidden overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(208,108,77,0.18),transparent_30%),radial-gradient(circle_at_top_left,rgba(80,119,154,0.18),transparent_28%),rgba(7,10,15,0.82)] px-3 py-3 backdrop-blur-md sm:px-4 sm:py-4 lg:px-6 lg:py-6',
+        state.isOverlayOpen && 'block'
       )}
       onClick={event => {
         if (event.target === event.currentTarget) {
@@ -281,67 +281,71 @@ export function OverlayApp({
         }
       }}
     >
-      <div className="grid h-full w-full max-w-[1280px] grid-rows-[auto_auto_auto_minmax(0,1fr)] overflow-hidden rounded-none border border-shell-border bg-[linear-gradient(180deg,rgba(18,23,32,0.98),rgba(15,20,27,0.98))] shadow-shell-strong sm:max-h-[calc(100vh-24px)] sm:rounded-shell-xl lg:max-h-[calc(100vh-48px)]">
-        <header className="relative grid gap-5 border-b border-shell-border p-4 md:grid-cols-[minmax(0,1.2fr)_minmax(16rem,0.8fr)] md:px-8 md:py-7">
+      <div className="mx-auto grid min-h-[calc(100dvh-1.5rem)] w-full max-w-[1280px] grid-cols-1 rounded-none border border-shell-border bg-[linear-gradient(180deg,rgba(18,23,32,0.98),rgba(15,20,27,0.98))] shadow-shell-strong sm:min-h-[calc(100dvh-2rem)] sm:rounded-shell-xl lg:min-h-[calc(100dvh-3rem)] xl:h-[min(56rem,calc(100dvh-3rem))] xl:grid-rows-[auto_auto_auto_minmax(0,1fr)] xl:overflow-hidden">
+        <header className="relative grid gap-5 border-b border-shell-border px-[calc(var(--st-safe-left)+1rem)] py-4 pr-[calc(var(--st-safe-right)+1rem)] pt-[calc(var(--st-safe-top)+1rem)] sm:px-5 sm:py-5 lg:px-8 lg:py-7 xl:grid-cols-[minmax(0,1.2fr)_minmax(16rem,0.8fr)]">
           <div className="absolute right-[-7rem] top-[-8rem] h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(208,108,77,0.24),transparent_72%)]" />
           <div className="absolute bottom-[-10rem] left-[-7rem] h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(80,119,154,0.2),transparent_74%)]" />
-          <div className="relative grid gap-4">
+          <div className="relative grid min-w-0 gap-4 pr-12 sm:pr-14">
             <div className="inline-flex items-center gap-2 text-[0.72rem] font-bold uppercase tracking-[0.18em] text-shell-text/68">Subtitles Tools 控制台</div>
-            <h2 className="font-serif text-[clamp(2rem,2.6vw,2.9rem)] leading-[1.04] text-shell-text">{state.itemData?.Name || '未命名媒体'}</h2>
-            <p className="max-w-[42rem] text-sm leading-8 text-shell-text-soft">{state.itemData?.ItemType || '媒体项目'} · {state.itemData?.IsMultipart ? '多分段媒体' : '单文件媒体'}。当前弹层用于分段纳管、字幕搜索、字幕内封与整组任务复核。</p>
+            <h2 className="font-serif text-[clamp(1.7rem,2.6vw,2.9rem)] leading-[1.06] text-shell-text sm:text-[clamp(2rem,2.6vw,2.9rem)]">{state.itemData?.Name || '未命名媒体'}</h2>
+            <p className="max-w-[42rem] text-sm leading-7 text-shell-text-soft sm:leading-8">{state.itemData?.ItemType || '媒体项目'} · {state.itemData?.IsMultipart ? '多分段媒体' : '单文件媒体'}。当前弹层用于分段纳管、字幕搜索、字幕内封与整组任务复核。</p>
             <div className="flex flex-wrap gap-2">
               <Badge tone="accent">{state.itemData?.IsMultipart ? '多分段媒体' : '单文件媒体'}</Badge>
               {headerSummary.map(item => <Badge key={item}>{item}</Badge>)}
             </div>
           </div>
-          <div className="relative grid content-start justify-items-end gap-3">
+          <div className="relative grid content-start justify-items-start gap-3 xl:justify-items-end">
             <button
               aria-label="关闭字幕控制台"
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/5 text-2xl text-shell-text transition hover:rotate-90 hover:bg-white/9 disabled:cursor-not-allowed disabled:opacity-60"
+              className="absolute right-0 top-0 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/5 text-2xl text-shell-text transition hover:rotate-90 hover:bg-white/9 disabled:cursor-not-allowed disabled:opacity-60 xl:static"
               disabled={state.busy}
               type="button"
               onClick={actions.closeOverlay}
             >
               ×
             </button>
-            <div className="w-full max-w-[20rem] rounded-shell-md border border-white/8 bg-white/4 p-4 text-sm leading-7 text-shell-text-soft">
+            <div className="hidden w-full rounded-shell-md border border-white/8 bg-white/4 p-4 text-sm leading-7 text-shell-text-soft lg:block xl:max-w-[20rem]">
               这套控制台遵循“先纳管与兼容修复，再搜索和内封”的顺序。若当前分段仍被标记为高风险，建议优先执行 MKV 转换。
             </div>
           </div>
         </header>
 
-        <section className="grid gap-3 border-b border-shell-border p-4 md:grid-cols-2 xl:grid-cols-4 md:px-8 md:py-5">
-          {(state.itemData ? getItemMetrics(state.itemData) : []).map(metric => <MetricCard key={metric.label} metric={metric} />)}
+        <section className="flex gap-3 overflow-x-auto border-b border-shell-border px-[calc(var(--st-safe-left)+1rem)] py-4 pr-[calc(var(--st-safe-right)+1rem)] sm:px-5 sm:py-5 lg:px-8 xl:grid xl:grid-cols-4 xl:overflow-visible">
+          {(state.itemData ? getItemMetrics(state.itemData) : []).map(metric => (
+            <div key={metric.label} className="min-w-[10.75rem] shrink-0 xl:min-w-0">
+              <MetricCard metric={metric} />
+            </div>
+          ))}
         </section>
 
-        <section className="grid gap-4 border-b border-shell-border p-4 md:px-8 md:py-5">
+        <section className="grid gap-4 border-b border-shell-border px-[calc(var(--st-safe-left)+1rem)] py-4 pr-[calc(var(--st-safe-right)+1rem)] sm:px-5 sm:py-5 lg:px-8">
           <StatusBanner
             label={getStatusLabel(state.statusTone)}
             message={state.statusMessage || '选择左侧分段后，即可开始搜索、转换和内封操作。'}
             title={getStatusTitle(state.statusTone)}
             tone={state.statusTone}
           />
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <Button disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.refresh()}>刷新分段状态</Button>
-            <Button disabled={state.busy || !activePart} type="button" variant="tertiary" onClick={() => void actions.searchCurrentPart()}>搜索当前分段</Button>
-            <Button disabled={state.busy || !activePart} type="button" variant="secondary" onClick={() => void actions.convertCurrentPart()}>转换当前分段为 MKV</Button>
-            <Button disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.convertGroup()}>一键整组转换为 MKV</Button>
-            <Button disabled={state.busy} type="button" variant="primary" onClick={() => void actions.downloadBest()}>一键整组最佳匹配并内封</Button>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+            <Button className="col-span-1" disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.refresh()}>刷新分段状态</Button>
+            <Button className="col-span-1" disabled={state.busy || !activePart} type="button" variant="tertiary" onClick={() => void actions.searchCurrentPart()}>搜索当前分段</Button>
+            <Button className="col-span-2 md:col-span-1" disabled={state.busy || !activePart} type="button" variant="secondary" onClick={() => void actions.convertCurrentPart()}>转换当前分段为 MKV</Button>
+            <Button className="col-span-1" disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.convertGroup()}>一键整组转换为 MKV</Button>
+            <Button className="col-span-2 md:col-span-2 xl:col-span-1" disabled={state.busy} type="button" variant="primary" onClick={() => void actions.downloadBest()}>一键整组最佳匹配并内封</Button>
           </div>
         </section>
 
-        <div className="grid min-h-0 lg:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)]">
-          <aside className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] border-b border-shell-border bg-white/2 lg:border-b-0 lg:border-r">
-            <div className="grid gap-2 border-b border-white/6 p-4 md:px-6 md:py-5">
+        <div className="grid gap-4 px-[calc(var(--st-safe-left)+1rem)] py-4 pr-[calc(var(--st-safe-right)+1rem)] pb-[calc(var(--st-safe-bottom)+1rem)] sm:px-5 sm:py-5 sm:pb-[calc(var(--st-safe-bottom)+1.25rem)] lg:px-8 lg:py-6 xl:min-h-0 xl:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)] xl:gap-0 xl:p-0">
+          <aside className="grid gap-4 rounded-shell-lg border border-shell-border bg-white/2 p-4 sm:p-5 xl:min-h-0 xl:grid-rows-[auto_minmax(0,1fr)] xl:gap-0 xl:rounded-none xl:border-0 xl:border-r xl:bg-white/2 xl:p-0">
+            <div className="grid gap-2 xl:border-b xl:border-white/6 xl:px-6 xl:py-5">
               <h3 className="font-serif text-[1.55rem] leading-tight text-shell-text">分段导航</h3>
               <p className="text-sm leading-7 text-shell-text-soft">左侧显示分段容器、纳管状态与兼容性状态。先选择分段，再执行搜索、转换或单段内封。</p>
             </div>
-            <div className="grid content-start gap-3 overflow-y-auto p-4 md:px-6 md:py-4">
+            <div className="xl:grid xl:content-start xl:gap-3 xl:overflow-y-auto xl:px-6 xl:py-4">
               <PartNavigation activePartId={state.activePartId} onSelect={actions.selectPart} parts={state.itemData?.Parts ?? []} />
             </div>
           </aside>
 
-          <main className="grid min-h-0 content-start gap-5 overflow-y-auto p-4 md:px-8 md:py-6">
+          <main className="grid content-start gap-5 rounded-shell-lg border border-shell-border bg-white/[0.02] p-4 sm:p-5 xl:min-h-0 xl:overflow-y-auto xl:rounded-none xl:border-0 xl:bg-transparent xl:px-8 xl:py-6">
             <section className="grid gap-4">
               <SectionHeading title="当前分段概览" description="这里聚焦当前分段的纳管状态、兼容性判断、路径与流水线信息，用来决定下一步操作。" />
               <CurrentPartCard part={activePart} />
@@ -373,14 +377,19 @@ export function FloatingButton({
   visible: boolean;
 }): JSX.Element {
   return (
-    <div className={cx('fixed bottom-6 right-6 z-[99999] translate-y-3 opacity-0 transition lg:bottom-8 lg:right-8', visible && 'translate-y-0 opacity-100')}>
+    <div
+      className={cx(
+        'fixed z-[99999] translate-y-3 opacity-0 transition [bottom:calc(var(--st-safe-bottom)+1rem)] [right:calc(var(--st-safe-right)+1rem)] sm:[bottom:calc(var(--st-safe-bottom)+1.25rem)] sm:[right:calc(var(--st-safe-right)+1.25rem)] lg:[bottom:calc(var(--st-safe-bottom)+2rem)] lg:[right:calc(var(--st-safe-right)+2rem)]',
+        visible && 'translate-y-0 opacity-100'
+      )}
+    >
       <button
-        className="grid min-w-[9.75rem] gap-1 rounded-[1.25rem] border border-white/8 bg-[linear-gradient(140deg,rgba(208,108,77,0.94),rgba(142,63,47,0.98))] px-5 py-4 text-left text-[rgb(255,248,244)] shadow-[0_18px_38px_rgba(10,13,20,0.38)] transition hover:-translate-y-0.5"
+        className="grid min-w-[8.5rem] gap-0.5 rounded-[1.15rem] border border-white/8 bg-[linear-gradient(140deg,rgba(208,108,77,0.94),rgba(142,63,47,0.98))] px-4 py-3 text-left text-[rgb(255,248,244)] shadow-[0_18px_38px_rgba(10,13,20,0.38)] transition hover:-translate-y-0.5 sm:min-w-[9.75rem] sm:gap-1 sm:rounded-[1.25rem] sm:px-5 sm:py-4"
         type="button"
         onClick={onOpen}
       >
         <span className="text-sm font-bold tracking-[0.04em]">字幕控制台</span>
-        <span className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[rgba(255,248,244,0.74)]">搜索 · 转换 · 内封</span>
+        <span className="hidden text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[rgba(255,248,244,0.74)] sm:block">搜索 · 转换 · 内封</span>
       </button>
     </div>
   );

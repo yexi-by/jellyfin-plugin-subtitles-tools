@@ -24,7 +24,7 @@ export function Button({
     <button
       {...props}
       className={cx(
-        'inline-flex min-h-12 items-center justify-center rounded-full border border-transparent px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 hover:-translate-y-0.5 disabled:hover:translate-y-0',
+        'inline-flex min-h-11 min-w-0 items-center justify-center rounded-[1rem] border border-transparent px-4 py-2.5 text-center text-sm font-semibold leading-6 transition disabled:cursor-not-allowed disabled:opacity-60 hover:-translate-y-0.5 disabled:hover:translate-y-0 sm:min-h-12 sm:rounded-full sm:px-5 sm:py-3',
         variants[variant],
         className
       )}
@@ -77,10 +77,10 @@ export function SectionHeading({
   title: ReactNode;
 }): JSX.Element {
   return (
-    <div className="grid gap-2">
+    <div className="grid gap-1.5 sm:gap-2">
       {eyebrow ? <div className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-shell-text/65">{eyebrow}</div> : null}
-      <h2 className="font-serif text-[clamp(1.4rem,2vw,1.8rem)] leading-tight">{title}</h2>
-      {description ? <p className="max-w-[44rem] text-sm leading-7 text-shell-text-soft">{description}</p> : null}
+      <h2 className="font-serif text-[clamp(1.25rem,2vw,1.8rem)] leading-tight sm:text-[clamp(1.4rem,2vw,1.8rem)]">{title}</h2>
+      {description ? <p className="max-w-[44rem] text-sm leading-6 text-shell-text-soft sm:leading-7">{description}</p> : null}
     </div>
   );
 }
@@ -122,12 +122,12 @@ export function StatusBanner({
   };
 
   return (
-    <div className={cx('grid gap-3 rounded-shell-md border p-4', styles[tone])}>
+    <div className={cx('grid gap-3 rounded-shell-md border p-3.5 sm:p-4', styles[tone])}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="rounded-full bg-white/8 px-3 py-1.5 text-[0.7rem] font-bold uppercase tracking-[0.14em] text-shell-text/82">{label}</span>
         <span className="text-sm font-semibold text-shell-text">{title}</span>
       </div>
-      <p className="text-sm leading-7 text-shell-text-soft">{message}</p>
+      <p className="text-sm leading-6 text-shell-text-soft sm:leading-7">{message}</p>
     </div>
   );
 }
@@ -138,7 +138,7 @@ export function ConnectionMetrics({ metrics }: { metrics: ConnectionMetric[] }):
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2">
       {metrics.map(metric => (
         <div key={metric.label} className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
           <span className="text-xs text-shell-text/65">{metric.label}</span>
@@ -158,10 +158,10 @@ export function MetricCard({ metric }: { metric: BatchMetric }): JSX.Element {
   };
 
   return (
-    <div className={cx('grid min-h-[7rem] gap-2 rounded-shell-lg border border-white/8 p-4', toneClasses[metric.tone])}>
+    <div className={cx('grid min-h-[6rem] gap-1.5 rounded-shell-lg border border-white/8 p-3.5 sm:min-h-[6.5rem] sm:gap-2 sm:p-4 xl:min-h-[7rem]', toneClasses[metric.tone])}>
       <span className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-shell-text/62">{metric.label}</span>
-      <strong className="text-[clamp(1.8rem,2.2vw,2.4rem)] leading-none text-shell-text">{metric.value}</strong>
-      <span className="text-sm leading-6 text-shell-text-soft">{metric.note}</span>
+      <strong className="text-[clamp(1.6rem,2.2vw,2.4rem)] leading-none text-shell-text sm:text-[clamp(1.8rem,2.2vw,2.4rem)]">{metric.value}</strong>
+      <span className="text-sm leading-5 text-shell-text-soft sm:leading-6">{metric.note}</span>
     </div>
   );
 }
@@ -174,9 +174,9 @@ export function EmptyState({
   title: ReactNode;
 }): JSX.Element {
   return (
-    <div className="grid gap-3 rounded-shell-lg border border-white/8 bg-white/4 p-5">
+    <div className="grid gap-3 rounded-shell-lg border border-white/8 bg-white/4 p-4 sm:p-5">
       <strong className="text-base font-semibold text-shell-text">{title}</strong>
-      <span className="text-sm leading-7 text-shell-text-soft">{description}</span>
+      <span className="text-sm leading-6 text-shell-text-soft sm:leading-7">{description}</span>
     </div>
   );
 }

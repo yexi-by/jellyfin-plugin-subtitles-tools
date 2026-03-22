@@ -33,6 +33,10 @@
 :where(#SubtitlesToolsConfigPage, #subtitlesToolsFloatingRoot, #subtitlesToolsOverlay) {
   color: var(--color-shell-text);
   font-family: var(--font-sans);
+  --st-safe-top: env(safe-area-inset-top, 0px);
+  --st-safe-right: env(safe-area-inset-right, 0px);
+  --st-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --st-safe-left: env(safe-area-inset-left, 0px);
 }
 
 :where(#SubtitlesToolsConfigPage, #subtitlesToolsFloatingRoot, #subtitlesToolsOverlay) * {
@@ -46,6 +50,7 @@
 
 :where(#subtitlesToolsOverlay) {
   scrollbar-color: rgba(243, 241, 236, 0.24) rgba(255, 255, 255, 0.04);
+  overscroll-behavior: contain;
 }
 
 :where(#subtitlesToolsOverlay) ::-webkit-scrollbar {
