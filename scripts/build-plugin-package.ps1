@@ -5,6 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $rootPath = Split-Path -Parent $PSScriptRoot
+$webUiPath = Join-Path $rootPath "webui"
 $projectPath = Join-Path $rootPath "Jellyfin.Plugin.SubtitlesTools\Jellyfin.Plugin.SubtitlesTools.csproj"
 $artifactRoot = Join-Path $rootPath "artifacts"
 $packageRoot = Join-Path $artifactRoot "package"
@@ -13,6 +14,18 @@ $packageRoot = Join-Path $artifactRoot "package"
 $version = $projectFile.Project.PropertyGroup.Version
 if ([string]::IsNullOrWhiteSpace($version)) {
     throw "Version was not found in the plugin csproj."
+}
+
+Push-Location $webUiPath
+try {
+    npm ci
+    npm run lint
+    npm run typecheck
+    npm run test -- --run
+    npm run build
+}
+finally {
+    Pop-Location
 }
 
 dotnet build $projectPath -c $Configuration

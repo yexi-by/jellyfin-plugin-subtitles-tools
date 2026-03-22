@@ -3,7 +3,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.SubtitlesTools</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.SubtitlesTools</AssemblyName>
-    <Version>0.7.0.0</Version>
+    <Version>0.7.1.0</Version>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Nullable>enable</Nullable>
@@ -22,8 +22,13 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Web\subtitlesTools.html" />
-    <EmbeddedResource Include="Web\subtitlesTools.js" />
-    <EmbeddedResource Include="Web\subtitlesToolsGlobal.js" />
+    <EmbeddedResource Include="..\webui\dist\subtitlesTools.js" LogicalName="Jellyfin.Plugin.SubtitlesTools.Web.subtitlesTools.js" />
+    <EmbeddedResource Include="..\webui\dist\subtitlesToolsGlobal.js" LogicalName="Jellyfin.Plugin.SubtitlesTools.Web.subtitlesToolsGlobal.js" />
   </ItemGroup>
+
+  <Target Name="EnsureWebUiBuildArtifacts" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('..\webui\dist\subtitlesTools.js')" Text="前端构建产物缺失：..\webui\dist\subtitlesTools.js。请先在 webui 目录执行 npm run build。" />
+    <Error Condition="!Exists('..\webui\dist\subtitlesToolsGlobal.js')" Text="前端构建产物缺失：..\webui\dist\subtitlesToolsGlobal.js。请先在 webui 目录执行 npm run build。" />
+  </Target>
 </Project>
 

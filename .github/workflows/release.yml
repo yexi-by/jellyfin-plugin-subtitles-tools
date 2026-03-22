@@ -17,10 +17,37 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: "webui/package-lock.json"
+
       - name: Setup .NET 9
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.0.x"
+
+      - name: Install webui dependencies
+        working-directory: webui
+        run: npm ci
+
+      - name: Lint webui
+        working-directory: webui
+        run: npm run lint
+
+      - name: Typecheck webui
+        working-directory: webui
+        run: npm run typecheck
+
+      - name: Test webui
+        working-directory: webui
+        run: npm run test -- --run
+
+      - name: Build webui
+        working-directory: webui
+        run: npm run build
 
       - name: Run tests
         run: dotnet test jellyfin-plugin-subtitles-tools.sln

@@ -1,0 +1,42 @@
+{
+  "name": "jellyfin-plugin-subtitles-tools-webui",
+  "private": true,
+  "version": "0.7.1.0",
+  "type": "module",
+  "scripts": {
+    "clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist', { recursive: true, force: true }))\"",
+    "build": "npm run clean && npm run build:config && npm run build:overlay",
+    "build:config": "vite build --config vite.config.config-page.ts",
+    "build:overlay": "vite build --config vite.config.overlay.ts --emptyOutDir false",
+    "build:watch": "node ./scripts/watch.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@tailwindcss/vite": "4.2.2",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "25.5.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@typescript-eslint/eslint-plugin": "8.57.1",
+    "@typescript-eslint/parser": "8.57.1",
+    "@vitejs/plugin-react": "6.0.1",
+    "eslint": "9.39.4",
+    "eslint-plugin-react-hooks": "7.0.1",
+    "eslint-plugin-react-refresh": "0.5.2",
+    "globals": "17.4.0",
+    "jsdom": "29.0.1",
+    "tailwindcss": "4.2.2",
+    "typescript": "5.9.3",
+    "vite": "8.0.1",
+    "vite-plugin-css-injected-by-js": "4.0.1",
+    "vitest": "4.1.0"
+  }
+}

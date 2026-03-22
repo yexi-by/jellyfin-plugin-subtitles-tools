@@ -7,3 +7,7 @@ TestResults/
 *.suo
 artifacts/
 release-assets/
+webui/node_modules/
+webui/dist/
+webui/coverage/
+webui/.vitest/

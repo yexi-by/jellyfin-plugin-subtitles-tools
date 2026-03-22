@@ -1,0 +1,66 @@
+@import "tailwindcss" prefix(st);
+
+@theme {
+  --font-sans: "Segoe UI Variable Text", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", serif;
+
+  --color-shell-bg: oklch(0.19 0.02 255);
+  --color-shell-bg-soft: oklch(0.23 0.025 252);
+  --color-shell-panel: oklch(0.27 0.025 252 / 0.94);
+  --color-shell-panel-strong: oklch(0.31 0.03 252 / 0.98);
+  --color-shell-border: oklch(0.93 0.01 90 / 0.12);
+  --color-shell-border-strong: oklch(0.93 0.01 90 / 0.2);
+  --color-shell-text: oklch(0.95 0.01 90);
+  --color-shell-text-soft: oklch(0.92 0.01 90 / 0.74);
+  --color-shell-text-faint: oklch(0.92 0.01 90 / 0.56);
+  --color-shell-accent: oklch(0.67 0.13 38);
+  --color-shell-accent-strong: oklch(0.52 0.1 33);
+  --color-shell-cool: oklch(0.58 0.06 244);
+  --color-shell-success: oklch(0.74 0.08 151);
+  --color-shell-warning: oklch(0.78 0.11 74);
+  --color-shell-danger: oklch(0.7 0.1 30);
+  --color-shell-highlight: oklch(0.93 0.03 60 / 0.12);
+
+  --radius-shell-sm: 0.9rem;
+  --radius-shell-md: 1.15rem;
+  --radius-shell-lg: 1.5rem;
+  --radius-shell-xl: 2rem;
+  --shadow-shell-soft: 0 18px 42px rgba(4, 8, 15, 0.24);
+  --shadow-shell-strong: 0 28px 70px rgba(4, 8, 15, 0.42);
+}
+
+:where(#SubtitlesToolsConfigPage, #subtitlesToolsFloatingRoot, #subtitlesToolsOverlay) {
+  color: var(--color-shell-text);
+  font-family: var(--font-sans);
+}
+
+:where(#SubtitlesToolsConfigPage, #subtitlesToolsFloatingRoot, #subtitlesToolsOverlay) * {
+  box-sizing: border-box;
+}
+
+:where(#SubtitlesToolsConfigPage, #subtitlesToolsOverlay) input,
+:where(#SubtitlesToolsConfigPage, #subtitlesToolsOverlay) button {
+  font: inherit;
+}
+
+:where(#subtitlesToolsOverlay) {
+  scrollbar-color: rgba(243, 241, 236, 0.24) rgba(255, 255, 255, 0.04);
+}
+
+:where(#subtitlesToolsOverlay) ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+:where(#subtitlesToolsOverlay) ::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(243, 241, 236, 0.18);
+  background-clip: padding-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(#SubtitlesToolsConfigPage, #subtitlesToolsFloatingRoot, #subtitlesToolsOverlay) * {
+    scroll-behavior: auto !important;
+  }
+}
