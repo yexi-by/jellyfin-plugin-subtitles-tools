@@ -272,8 +272,8 @@ export function OverlayApp({
   return (
     <div
       className={cx(
-        'fixed inset-0 z-[100000] hidden overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(208,108,77,0.18),transparent_30%),radial-gradient(circle_at_top_left,rgba(80,119,154,0.18),transparent_28%),rgba(7,10,15,0.82)] px-3 py-3 backdrop-blur-md sm:px-4 sm:py-4 lg:px-6 lg:py-6',
-        state.isOverlayOpen && 'block'
+        'fixed inset-0 z-[100000] overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(208,108,77,0.18),transparent_30%),radial-gradient(circle_at_top_left,rgba(80,119,154,0.18),transparent_28%),rgba(7,10,15,0.82)] px-3 py-3 backdrop-blur-md sm:px-4 sm:py-4 lg:px-6 lg:py-6',
+        state.isOverlayOpen ? 'block' : 'hidden'
       )}
       onClick={event => {
         if (event.target === event.currentTarget) {
