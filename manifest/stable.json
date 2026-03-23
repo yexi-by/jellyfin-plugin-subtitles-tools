@@ -10,12 +10,12 @@
     "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
     "versions": [
       {
-        "version": "0.7.2.3",
+        "version": "0.7.2.4",
         "changelog": "重写插件 WebUI 的用户文案与信息架构：设置页改为服务连接、常规设置和高级设置三段式；字幕控制台改为当前文件操作、整组操作、找到的字幕、已有字幕和最近处理结果，并补齐结果优先的状态反馈与手机、平板、桌面响应式布局。",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.2.3/Jellyfin.Plugin.SubtitlesTools_0.7.2.3.zip",
-        "checksum": "2F3571103002B881F208052CD7FA300B",
-        "timestamp": "2026-03-23T09:30:14Z"
+        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.2.4/Jellyfin.Plugin.SubtitlesTools_0.7.2.4.zip",
+        "checksum": "DB849B02D81FFB0E30A949EAADE6E2DA",
+        "timestamp": "2026-03-23T10:17:25Z"
       }
     ]
   }
