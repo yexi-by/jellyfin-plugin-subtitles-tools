@@ -16,8 +16,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Jellyfin.Plugin.SubtitlesTools.Api;
 
 /// <summary>
-/// 提供插件配置测试、分段纳管、字幕搜索、下载内封与内封字幕删除所需的接口。
-/// 当前版本会先纳管并修复视频兼容性，再执行字幕搜索、下载和内封，不再管理外挂字幕。
+/// 提供插件配置测试、分段纳管、字幕搜索、下载写入与内封字幕删除所需的接口。
+/// 当前版本会先纳管并修复视频兼容性，再执行字幕搜索、下载和字幕写入；写入模式支持内封与外挂。
 /// </summary>
 [ApiController]
 [Produces(MediaTypeNames.Application.Json)]
@@ -270,7 +270,7 @@ public sealed class SubtitlesToolsController : ControllerBase
     }
 
     /// <summary>
-    /// 下载指定候选字幕并内封到当前分段。
+    /// 下载指定候选字幕并按模式写入当前分段。
     /// </summary>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts/{partId}/download")]
     [ProducesResponseType(typeof(ManagedPartDownloadResponseDto), StatusCodes.Status200OK)]
@@ -366,7 +366,7 @@ public sealed class SubtitlesToolsController : ControllerBase
     }
 
     /// <summary>
-    /// 为所有分段分别搜索并内封第一名字幕候选。
+    /// 为所有分段分别搜索并写入第一名字幕候选。
     /// </summary>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/download-best")]
     [ProducesResponseType(typeof(ManagedBatchOperationResponseDto), StatusCodes.Status200OK)]

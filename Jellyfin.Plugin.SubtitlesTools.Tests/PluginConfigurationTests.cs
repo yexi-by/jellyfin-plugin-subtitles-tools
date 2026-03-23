@@ -99,8 +99,26 @@ public sealed class PluginConfigurationTests
         var configuration = new PluginConfiguration();
 
         Assert.True(configuration.EnableAutoVideoConvertToMkv);
+        Assert.Equal(PluginConfiguration.DefaultSubtitleWriteModeValue, configuration.DefaultSubtitleWriteMode);
         Assert.Equal(1, configuration.VideoConvertConcurrency);
         Assert.Equal(string.Empty, configuration.FfmpegExecutablePath);
         Assert.Equal("/dev/dri/renderD128", configuration.QsvRenderDevicePath);
+    }
+
+    /// <summary>
+    /// 默认字幕写入模式只允许内封或外挂；未知值回落到内封。
+    /// </summary>
+    [Theory]
+    [InlineData(null, "embedded")]
+    [InlineData("", "embedded")]
+    [InlineData("embedded", "embedded")]
+    [InlineData("sidecar", "sidecar")]
+    [InlineData("SIDEcar", "sidecar")]
+    [InlineData("unknown", "embedded")]
+    public void NormalizeSubtitleWriteMode_ShouldClampToKnownValues(string? input, string expected)
+    {
+        var value = PluginConfiguration.NormalizeSubtitleWriteMode(input);
+
+        Assert.Equal(expected, value);
     }
 }

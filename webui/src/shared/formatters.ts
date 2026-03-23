@@ -5,6 +5,7 @@ import type {
   ItemPartsPayload,
   MediaPart,
   OperationResultItem,
+  SubtitleWriteMode,
   UiTone
 } from './types';
 
@@ -93,7 +94,7 @@ export function getCompatibilityStatusText(part: MediaPart): string {
   }
 
   if (part.NeedsCompatibilityRepair === true) {
-    return `${part.RiskVerdict}（需要修复）`;
+    return `${part.RiskVerdict}（需修复）`;
   }
 
   return part.RiskVerdict;
@@ -116,7 +117,7 @@ export function getCompatibilityTone(part: MediaPart): Extract<UiTone, 'neutral'
 }
 
 export function getBatchTone(status: string | undefined): Extract<UiTone, 'neutral' | 'success' | 'warning' | 'danger'> {
-  if (status === 'embedded' || status === 'converted' || status === 'completed') {
+  if (status === 'embedded' || status === 'sidecar' || status === 'converted' || status === 'completed') {
     return 'success';
   }
 
@@ -139,7 +140,8 @@ export function getBatchStatusText(status: string | undefined): string {
     embedded: '已内封',
     failed: '失败',
     no_candidates: '无候选',
-    partial: '部分完成'
+    partial: '部分完成',
+    sidecar: '已写为外挂'
   };
 
   return status ? (labels[status] ?? status) : '未知状态';
@@ -150,6 +152,7 @@ export function getItemMetrics(itemData: ItemPartsPayload): BatchMetric[] {
   const managedCount = parts.filter(part => part.IsManaged === true).length;
   const repairCount = parts.filter(part => part.NeedsCompatibilityRepair === true).length;
   const embeddedCount = parts.reduce((sum, part) => sum + (part.EmbeddedSubtitles?.length ?? 0), 0);
+  const externalCount = parts.reduce((sum, part) => sum + (part.ExternalSubtitles?.length ?? 0), 0);
   const pluginManagedCount = parts.reduce((sum, part) => {
     return sum + (part.EmbeddedSubtitles?.filter(track => track.IsPluginManaged === true).length ?? 0);
   }, 0);
@@ -178,6 +181,12 @@ export function getItemMetrics(itemData: ItemPartsPayload): BatchMetric[] {
       value: String(embeddedCount),
       note: pluginManagedCount > 0 ? `插件写入 ${pluginManagedCount} 条字幕轨` : '暂未检测到插件写入轨道',
       tone: embeddedCount > 0 ? 'success' : 'neutral'
+    },
+    {
+      label: '外挂字幕总数',
+      value: String(externalCount),
+      note: externalCount > 0 ? '当前媒体目录中已检测到可被 Jellyfin 识别的外挂字幕' : '当前媒体目录中还没有匹配到外挂字幕文件',
+      tone: externalCount > 0 ? 'success' : 'neutral'
     }
   ];
 }
@@ -204,15 +213,21 @@ export function getStatusLabel(tone: Extract<UiTone, 'idle' | 'busy' | 'success'
   return labels[tone];
 }
 
-export function getPartSelectionSummary(part: MediaPart | null, activeSearchCount: number): string[] {
+export function getPartSelectionSummary(part: MediaPart | null, activeSearchCount: number, mode?: SubtitleWriteMode): string[] {
   if (!part) {
     return [];
   }
 
-  return [
+  const summary = [
     `当前选中：${part.Label}`,
     `候选字幕 ${activeSearchCount} 条`
   ];
+
+  if (mode) {
+    summary.push(`写入模式：${getSubtitleWriteModeLabel(mode)}`);
+  }
+
+  return summary;
 }
 
 export function summarizeResultMessage(result: OperationResultItem | null | undefined): string {
@@ -221,4 +236,8 @@ export function summarizeResultMessage(result: OperationResultItem | null | unde
   }
 
   return result.Message?.trim() || '操作已完成。';
+}
+
+export function getSubtitleWriteModeLabel(mode: SubtitleWriteMode): string {
+  return mode === 'sidecar' ? '外挂字幕' : '内封字幕';
 }

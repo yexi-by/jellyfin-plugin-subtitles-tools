@@ -1,8 +1,11 @@
 import { createRoot } from 'react-dom/client';
 import '../design-system/theme.css';
-import { OVERLAY_IDS, ROUTE_POLL_MS } from '../shared/constants';
+import { OVERLAY_IDS, PLUGIN_UNIQUE_ID, ROUTE_POLL_MS } from '../shared/constants';
 import { getCurrentItemId } from '../shared/dom';
 import { extractErrorMessage } from '../shared/errors';
+import { getSubtitleWriteModeLabel } from '../shared/formatters';
+import { readPluginConfiguration } from '../shared/runtime';
+import type { SubtitleWriteMode } from '../shared/types';
 import { FloatingButton, OverlayApp } from './App';
 import {
   applyBatchResults,
@@ -17,6 +20,7 @@ import {
   deletePartEmbeddedSubtitle,
   downloadBest,
   downloadCandidate,
+  fetchPartsPayload,
   getActivePart,
   getOverlayState,
   openOverlay,
@@ -28,8 +32,8 @@ import {
   setBusy,
   setSearchResults,
   setStatus,
-  subscribe,
-  fetchPartsPayload
+  setSubtitleWriteMode,
+  subscribe
 } from './store';
 
 function ensureRoot(id: string): HTMLElement {
@@ -44,11 +48,30 @@ function ensureRoot(id: string): HTMLElement {
   return element;
 }
 
+function normalizeWriteMode(value: string | undefined): SubtitleWriteMode {
+  return value === 'sidecar' ? 'sidecar' : 'embedded';
+}
+
 if (!window.__subtitlesToolsGlobalLoaded) {
   window.__subtitlesToolsGlobalLoaded = true;
 
   const floatingRoot = createRoot(ensureRoot(OVERLAY_IDS.floatingRoot));
   const overlayRoot = createRoot(ensureRoot(OVERLAY_IDS.overlayRoot));
+  let hasLoadedDefaultWriteMode = false;
+
+  async function syncDefaultWriteMode(): Promise<void> {
+    if (hasLoadedDefaultWriteMode) {
+      return;
+    }
+
+    hasLoadedDefaultWriteMode = true;
+    try {
+      const configuration = await readPluginConfiguration(PLUGIN_UNIQUE_ID);
+      setSubtitleWriteMode(normalizeWriteMode(configuration.DefaultSubtitleWriteMode));
+    } catch {
+      // 配置读取失败时保留默认内封模式，不阻塞详情页控制台。
+    }
+  }
 
   async function refreshOverlayData(): Promise<void> {
     const currentItemId = getOverlayState().itemId ?? getCurrentItemId();
@@ -117,16 +140,18 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       throw new Error('未找到对应的字幕候选。');
     }
 
-    setStatus(`正在下载并内封 ${candidate.DisplayName || candidate.Name || '当前候选字幕'}…`, 'busy');
-    const result = await downloadCandidate(snapshot.itemId, activePart, candidate);
-    if (result.Status !== 'embedded') {
-      throw new Error(result.Message || '字幕内封失败。');
+    const writeMode = snapshot.subtitleWriteMode;
+    const writeModeLabel = getSubtitleWriteModeLabel(writeMode);
+    setStatus(`正在下载并写入 ${candidate.DisplayName || candidate.Name || '当前候选字幕'}，模式：${writeModeLabel}…`, 'busy');
+    const result = await downloadCandidate(snapshot.itemId, activePart, candidate, writeMode);
+    if (result.Status !== 'embedded' && result.Status !== 'sidecar') {
+      throw new Error(result.Message || '字幕写入失败。');
     }
 
     setBatchResults([]);
     applyOperationResultToPart(activePart.Id, result);
     await refreshOverlayDataWithRetry(createSinglePartRefreshValidator(activePart.Id, result));
-    setStatus(result.Message || '字幕已内封到当前分段。', 'success');
+    setStatus(result.Message || `字幕已按${writeModeLabel}模式写入当前分段。`, 'success');
   }
 
   async function removeEmbeddedSubtitle(streamIndex: number): Promise<void> {
@@ -158,13 +183,14 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       throw new Error('当前页面没有可管理的媒体详情。');
     }
 
-    setStatus('正在为整组分段搜索最佳字幕并内封…', 'busy');
-    const payload = await downloadBest(snapshot.itemId);
+    const writeModeLabel = getSubtitleWriteModeLabel(snapshot.subtitleWriteMode);
+    setStatus(`正在为整组分段搜索最佳字幕并写入${writeModeLabel}…`, 'busy');
+    const payload = await downloadBest(snapshot.itemId, snapshot.subtitleWriteMode);
     const items = payload.Items ?? [];
     setBatchResults(items);
     applyBatchResults(items);
     await refreshOverlayDataWithRetry(createBatchRefreshValidator(items));
-    setStatus(payload.Message || '整组字幕内封完成。', payload.Status === 'completed' ? 'success' : 'idle');
+    setStatus(payload.Message || `整组字幕${writeModeLabel}写入完成。`, payload.Status === 'completed' ? 'success' : 'idle');
   }
 
   async function withBusyState(task: () => Promise<void>): Promise<void> {
@@ -202,6 +228,10 @@ if (!window.__subtitlesToolsGlobalLoaded) {
               statusMessage: '',
               statusTone: 'idle'
             });
+          },
+          setSubtitleWriteMode: (mode: SubtitleWriteMode) => {
+            setSubtitleWriteMode(mode);
+            setStatus(`当前写入模式已切换为${getSubtitleWriteModeLabel(mode)}。`, 'idle');
           }
         }}
         state={snapshot}
@@ -228,5 +258,6 @@ if (!window.__subtitlesToolsGlobalLoaded) {
     void refreshCurrentPageState(false);
   }, ROUTE_POLL_MS);
 
+  void syncDefaultWriteMode();
   void refreshCurrentPageState(true);
 }

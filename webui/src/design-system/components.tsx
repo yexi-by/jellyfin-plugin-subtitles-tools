@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, JSX, ReactNode } from 'react';
-import type { BatchMetric, ConnectionMetric, UiTone } from '../shared/types';
+import type { BatchMetric, ConnectionMetric, SubtitleWriteMode, UiTone } from '../shared/types';
 
 type ButtonVariant = 'danger' | 'primary' | 'secondary' | 'tertiary';
 
@@ -177,6 +177,57 @@ export function EmptyState({
     <div className="grid gap-3 rounded-shell-lg border border-white/8 bg-white/4 p-4 sm:p-5">
       <strong className="text-base font-semibold text-shell-text">{title}</strong>
       <span className="text-sm leading-6 text-shell-text-soft sm:leading-7">{description}</span>
+    </div>
+  );
+}
+
+export function WriteModeSwitch({
+  disabled = false,
+  mode,
+  onChange
+}: {
+  disabled?: boolean;
+  mode: SubtitleWriteMode;
+  onChange: (mode: SubtitleWriteMode) => void;
+}): JSX.Element {
+  const options: Array<{ description: string; label: string; value: SubtitleWriteMode }> = [
+    {
+      description: '写入 MKV，更适合归档。',
+      label: '内封字幕',
+      value: 'embedded'
+    },
+    {
+      description: '直接生成同名 SRT，更适合 NAS。',
+      label: '外挂字幕',
+      value: 'sidecar'
+    }
+  ];
+
+  return (
+    <div className="grid gap-2 rounded-shell-md border border-white/8 bg-white/4 p-2 sm:p-2.5">
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map(option => {
+          const active = mode === option.value;
+          return (
+            <button
+              key={option.value}
+              className={cx(
+                'grid gap-1 rounded-[0.9rem] border px-4 py-3 text-left transition sm:rounded-full',
+                active
+                  ? 'border-shell-accent/35 bg-[linear-gradient(135deg,rgba(208,108,77,0.18),rgba(80,119,154,0.16))] text-shell-text'
+                  : 'border-transparent bg-transparent text-shell-text-soft hover:border-white/8 hover:bg-white/4',
+                disabled && 'cursor-not-allowed opacity-60'
+              )}
+              disabled={disabled}
+              type="button"
+              onClick={() => onChange(option.value)}
+            >
+              <span className="text-sm font-semibold leading-6">{option.label}</span>
+              <span className="text-xs leading-5 text-shell-text-soft">{option.description}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

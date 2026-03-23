@@ -27,6 +27,14 @@ function buildState(): OverlayStoreState {
               Title: '简体中文字幕'
             }
           ],
+          ExternalSubtitles: [
+            {
+              FileName: 'movie-part-1.zho.srt',
+              FilePath: '/media/movie-part-1.zho.srt',
+              Format: 'srt',
+              Language: 'zho'
+            }
+          ],
           FileName: 'movie-part-1.mkv',
           Id: 'part-1',
           Index: 1,
@@ -39,6 +47,8 @@ function buildState(): OverlayStoreState {
         },
         {
           Container: 'mp4',
+          EmbeddedSubtitles: [],
+          ExternalSubtitles: [],
           FileName: 'movie-part-2.mp4',
           Id: 'part-2',
           Index: 2,
@@ -57,20 +67,33 @@ function buildState(): OverlayStoreState {
         Label: 'Part 1',
         Message: '已完成处理',
         PartId: 'part-1',
-        Status: 'completed'
+        Status: 'sidecar',
+        WriteMode: 'sidecar'
       }
     ],
     lastLocation: '/web/index.html#!/details?id=item-1',
     searchResults: new Map([
-      ['part-1', [{ DisplayName: '候选字幕一', Id: 'candidate-1', Language: 'zh-CN', Score: 98 }]]
+      [
+        'part-1',
+        [
+          {
+            DisplayName: '候选字幕一',
+            Id: 'candidate-1',
+            Language: 'zh-CN',
+            Score: 98,
+            SidecarFileName: 'movie-part-1.zho.srt'
+          }
+        ]
+      ]
     ]),
     statusMessage: '最近一次操作成功。',
-    statusTone: 'success'
+    statusTone: 'success',
+    subtitleWriteMode: 'sidecar'
   };
 }
 
 describe('OverlayApp', () => {
-  it('渲染当前媒体概览并分发关键操作事件', () => {
+  it('渲染当前媒体概览、外挂信息并分发关键操作事件', () => {
     const actions = {
       closeOverlay: vi.fn(),
       convertCurrentPart: vi.fn(async () => undefined),
@@ -80,22 +103,27 @@ describe('OverlayApp', () => {
       downloadCandidate: vi.fn(async () => undefined),
       refresh: vi.fn(async () => undefined),
       searchCurrentPart: vi.fn(async () => undefined),
-      selectPart: vi.fn()
+      selectPart: vi.fn(),
+      setSubtitleWriteMode: vi.fn()
     };
 
     render(<OverlayApp actions={actions} state={buildState()} />);
 
     expect(screen.getByText('示例影片')).toBeInTheDocument();
-    expect(screen.getByText('分段总数')).toBeInTheDocument();
+    expect(screen.getByText('外挂字幕总数')).toBeInTheDocument();
+    expect(screen.getAllByText('movie-part-1.zho.srt')).toHaveLength(2);
     expect(screen.getByText('候选字幕一')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '下载并内封到当前分段' }));
+    fireEvent.click(screen.getByRole('button', { name: '下载并写为外挂字幕' }));
     expect(actions.downloadCandidate).toHaveBeenCalledWith('candidate-1');
+
+    fireEvent.click(screen.getAllByRole('button', { name: /内封字幕/ })[0]);
+    expect(actions.setSubtitleWriteMode).toHaveBeenCalledWith('embedded');
 
     fireEvent.click(screen.getByRole('button', { name: /Part 2/ }));
     expect(actions.selectPart).toHaveBeenCalledWith('part-2');
 
     fireEvent.click(screen.getByRole('button', { name: '关闭字幕控制台' }));
     expect(actions.closeOverlay).toHaveBeenCalled();
-  });
+});
 });

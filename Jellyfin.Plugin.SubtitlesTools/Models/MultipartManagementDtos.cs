@@ -58,6 +58,7 @@ public sealed class ManagedMediaPartDto
     public string Pipeline { get; set; } = string.Empty;
     public bool NeedsCompatibilityRepair { get; set; }
     public List<ManagedEmbeddedSubtitleDto> EmbeddedSubtitles { get; set; } = [];
+    public List<ManagedExternalSubtitleDto> ExternalSubtitles { get; set; } = [];
 }
 
 /// <summary>
@@ -71,6 +72,17 @@ public sealed class ManagedEmbeddedSubtitleDto
     public string Language { get; set; } = "und";
     public string Format { get; set; } = "srt";
     public bool IsPluginManaged { get; set; }
+}
+
+/// <summary>
+/// 表示媒体同目录的一条外挂字幕文件。
+/// </summary>
+public sealed class ManagedExternalSubtitleDto
+{
+    public string FileName { get; set; } = string.Empty;
+    public string FilePath { get; set; } = string.Empty;
+    public string Language { get; set; } = "und";
+    public string Format { get; set; } = "srt";
 }
 
 /// <summary>
@@ -108,6 +120,7 @@ public sealed class ManagedSubtitleCandidateDto
     public double FingerprintScore { get; set; }
     public string? ExtraName { get; set; }
     public string TemporarySrtFileName { get; set; } = string.Empty;
+    public string SidecarFileName { get; set; } = string.Empty;
 }
 
 public sealed class ManagedPartDownloadRequestDto
@@ -117,12 +130,14 @@ public sealed class ManagedPartDownloadRequestDto
     public string Ext { get; set; } = string.Empty;
     public List<string> Languages { get; set; } = [];
     public string Language { get; set; } = string.Empty;
+    public string WriteMode { get; set; } = string.Empty;
 }
 
 public sealed class ManagedPartDownloadResponseDto
 {
     public string Status { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
+    public string WriteMode { get; set; } = string.Empty;
     public string MediaPath { get; set; } = string.Empty;
     public string Container { get; set; } = string.Empty;
     public bool IsManaged { get; set; }
@@ -131,6 +146,7 @@ public sealed class ManagedPartDownloadResponseDto
     public bool NeedsCompatibilityRepair { get; set; }
     public bool UsedCompatibilityRepairReencode { get; set; }
     public ManagedEmbeddedSubtitleDto? EmbeddedSubtitle { get; set; }
+    public ManagedExternalSubtitleDto? ExternalSubtitle { get; set; }
 }
 
 public sealed class ManagedPartConvertResponseDto
@@ -160,6 +176,7 @@ public sealed class ManagedDeleteEmbeddedSubtitleResponseDto
 
 public sealed class ManagedDownloadBestRequestDto
 {
+    public string WriteMode { get; set; } = string.Empty;
 }
 
 public sealed class ManagedConvertGroupRequestDto
@@ -187,4 +204,6 @@ public sealed class ManagedBatchPartResultDto
     public bool NeedsCompatibilityRepair { get; set; }
     public bool UsedCompatibilityRepairReencode { get; set; }
     public ManagedEmbeddedSubtitleDto? EmbeddedSubtitle { get; set; }
+    public ManagedExternalSubtitleDto? ExternalSubtitle { get; set; }
+    public string WriteMode { get; set; } = string.Empty;
 }

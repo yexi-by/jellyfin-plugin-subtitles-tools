@@ -6,7 +6,8 @@ import {
   FieldShell,
   Panel,
   SectionHeading,
-  StatusBanner
+  StatusBanner,
+  WriteModeSwitch
 } from '../design-system/components';
 import '../design-system/theme.css';
 import { API_ROOT, PLUGIN_UNIQUE_ID } from '../shared/constants';
@@ -15,7 +16,8 @@ import {
   buildErrorConnectionStatus,
   buildIdleConnectionStatus,
   buildLoadingConnectionStatus,
-  buildSuccessConnectionStatus
+  buildSuccessConnectionStatus,
+  getSubtitleWriteModeLabel
 } from '../shared/formatters';
 import {
   hideLoading,
@@ -26,9 +28,10 @@ import {
   showError,
   showLoading
 } from '../shared/runtime';
-import type { ConnectionHealthPayload, ConnectionStatusViewModel, PluginConfiguration } from '../shared/types';
+import type { ConnectionHealthPayload, ConnectionStatusViewModel, PluginConfiguration, SubtitleWriteMode } from '../shared/types';
 
 const defaultConfiguration: PluginConfiguration = {
+  DefaultSubtitleWriteMode: 'embedded',
   EnableAutoVideoConvertToMkv: true,
   FfmpegExecutablePath: '',
   QsvRenderDevicePath: '/dev/dri/renderD128',
@@ -39,6 +42,10 @@ const defaultConfiguration: PluginConfiguration = {
 
 function textInputClassName(): string {
   return 'w-full rounded-shell-sm border border-white/10 bg-shell-bg-soft px-4 py-3 text-sm text-shell-text outline-none transition placeholder:text-shell-text-faint focus:border-shell-accent/45 focus:ring-2 focus:ring-shell-accent/15';
+}
+
+function normalizeWriteMode(value: string | undefined): SubtitleWriteMode {
+  return value === 'sidecar' ? 'sidecar' : 'embedded';
 }
 
 export function ConfigPageApp(): JSX.Element {
@@ -53,6 +60,7 @@ export function ConfigPageApp(): JSX.Element {
       const response = await readPluginConfiguration(PLUGIN_UNIQUE_ID);
       startTransition(() => {
         setConfiguration({
+          DefaultSubtitleWriteMode: normalizeWriteMode(response.DefaultSubtitleWriteMode),
           EnableAutoVideoConvertToMkv: response.EnableAutoVideoConvertToMkv !== false,
           FfmpegExecutablePath: response.FfmpegExecutablePath || '',
           QsvRenderDevicePath: response.QsvRenderDevicePath || '/dev/dri/renderD128',
@@ -119,15 +127,15 @@ export function ConfigPageApp(): JSX.Element {
           <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.95fr)]">
             <div className="grid gap-4">
               <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-shell-text/70">Subtitles Tools 控制台</div>
-              <h1 className="max-w-[48rem] font-serif text-[clamp(2rem,4vw,3.35rem)] leading-[1.02]">把字幕搜索、纳管修复与内封流程收进一套统一前端工作台。</h1>
+              <h1 className="max-w-[48rem] font-serif text-[clamp(2rem,4vw,3.35rem)] leading-[1.02]">把字幕搜索、纳管修复与写入方式收进一套统一前端工作台。</h1>
               <p className="max-w-[44rem] text-sm leading-8 text-shell-text-soft">
-                当前配置页聚焦 Python 服务连接、自动纳管策略、转码执行环境与运行边界说明。保存前先完成连通性检测，可以更快定位 FFmpeg、QSV 和字幕源问题。
+                当前配置页聚焦 Python 服务连接、自动纳管策略、字幕默认写入模式与转码执行环境说明。保存前先完成连通性检测，可以更快定位 FFmpeg、QSV 和字幕源问题。
               </p>
               <div className="flex flex-wrap gap-2.5">
                 <Badge tone="accent">深色影院控制台</Badge>
                 <Badge>Intel QSV 优先</Badge>
                 <Badge>本地媒体专用</Badge>
-                <Badge>适配 Jellyfin 10.11</Badge>
+                <Badge>内封 / 外挂双模式</Badge>
               </div>
             </div>
             <div className="grid gap-4">
@@ -137,8 +145,8 @@ export function ConfigPageApp(): JSX.Element {
                   {[
                     ['01', '先纳管与兼容修复', '先确认容器、编码与 MKV 元数据是否已经处于插件可识别状态。'],
                     ['02', '再搜索与匹配', '依赖 Python 服务按 CID / GCID / 文件名组合查找候选字幕。'],
-                    ['03', '统一转为 UTF-8 SRT', '候选字幕会先归一化为兼容性更好的 UTF-8 SRT，再进入内封阶段。'],
-                    ['04', '写入 MKV 并清理临时文件', '成功写入后自动清理临时 SRT，减少额外文件残留。']
+                    ['03', '统一转为 UTF-8 SRT', '候选字幕会先归一化为兼容性更好的 UTF-8 SRT，再进入写入阶段。'],
+                    ['04', '按模式写入字幕', '可以写回 MKV 形成内封，也可以直接生成同目录外挂字幕文件。']
                   ].map(([index, title, description]) => (
                     <li key={index} className="grid grid-cols-[auto_1fr] gap-3">
                       <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(208,108,77,0.24),rgba(80,119,154,0.22))] text-xs font-bold text-shell-text">{index}</span>
@@ -177,7 +185,10 @@ export function ConfigPageApp(): JSX.Element {
           </Panel>
 
           <Panel className="xl:col-span-5">
-            <SectionHeading title="处理策略" description="这些选项决定插件是偏向自动接管新入库媒体，还是只在你手动触发时执行兼容修复。" />
+            <SectionHeading title="处理策略" description="这些选项决定插件偏向什么样的写入结果，以及是否自动纳管新入库媒体。" />
+            <FieldShell label="默认字幕写入模式" description={<>当前默认模式：<strong className="text-shell-text">{getSubtitleWriteModeLabel(configuration.DefaultSubtitleWriteMode)}</strong>。详情页里仍然可以临时切换，不会强制写死。</>}>
+              <WriteModeSwitch mode={configuration.DefaultSubtitleWriteMode} onChange={mode => setConfiguration(current => ({ ...current, DefaultSubtitleWriteMode: mode }))} />
+            </FieldShell>
             <label className="grid gap-3 rounded-shell-md border border-white/8 bg-white/4 p-4">
               <span className="flex items-start gap-3">
                 <input
@@ -188,7 +199,7 @@ export function ConfigPageApp(): JSX.Element {
                 />
                 <span className="text-sm font-semibold leading-6 text-shell-text">新视频入库后自动纳管并修复安卓硬解兼容</span>
               </span>
-              <span className="text-[0.82rem] leading-6 text-shell-text-soft">默认开启。新文件若已是 MKV，则会补算 CID / GCID 并写入 MKV 元数据；若命中高风险编码或容器，则优先走 Intel QSV 修复为 H.264 + AAC + MKV。</span>
+              <span className="text-[0.82rem] leading-6 text-shell-text-soft">默认开启。新文件若已是 MKV，则补写 CID / GCID 到 MKV 元数据；若命中高风险编码或容器，则优先走 Intel QSV 修复为 H.264 + AAC + MKV。</span>
             </label>
             <FieldShell label="视频转换并发数" description="默认 1。视频转换是重 I/O 操作，网络盘和机械盘不建议设置过高。">
               <input
@@ -202,9 +213,9 @@ export function ConfigPageApp(): JSX.Element {
             </FieldShell>
             <ul className="grid gap-2">
               {[
-                '历史影片建议通过计划任务统一补齐 CID/GCID 与 MKV 转换，再到详情页做单片精修。',
-                '插件当前不管理外挂字幕，所有成功写入的字幕都以内封轨形式存在于 MKV 中。',
-                '自动纳管更适合长期稳定提供 QSV 的运行环境。'
+                '默认外挂更适合 NAS，字幕写入只会生成同目录字幕文件，不需要重写整个 MKV。',
+                '默认内封更适合长期归档，成功后客户端不再依赖同目录外挂字幕文件。',
+                '写入模式只影响“下载字幕后怎么落盘”，不会跳过前面的纳管和兼容修复。'
               ].map(item => (
                 <li key={item} className="grid grid-cols-[auto_1fr] gap-3 text-sm leading-7 text-shell-text-soft">
                   <span className="text-shell-accent">•</span>
@@ -241,7 +252,7 @@ export function ConfigPageApp(): JSX.Element {
             <ul className="grid gap-2">
               {[
                 '插件先看 MKV 元数据，再决定是否已纳管，不依赖外挂文件名推断。',
-                '搜索和一键内封前，会优先确认视频已经纳管，并对高风险片段先做兼容修复。',
+                '搜索和写入字幕前，会优先确认视频已经纳管，并对高风险片段先做兼容修复。',
                 '如果只是批量补齐旧媒体，优先走计划任务统一处理，再到详情页做单片微调。'
               ].map(item => (
                 <li key={item} className="grid grid-cols-[auto_1fr] gap-3 text-sm leading-7 text-shell-text-soft">
@@ -256,7 +267,7 @@ export function ConfigPageApp(): JSX.Element {
         <div className="sticky bottom-3 flex flex-wrap items-center justify-between gap-4 rounded-shell-lg border border-shell-border-strong bg-[rgba(15,20,27,0.9)] p-4 shadow-shell-soft backdrop-blur-md">
           <div className="grid gap-1">
             <strong className="text-sm font-semibold text-shell-text">建议顺序：先测试连接，再保存配置</strong>
-            <span className="text-sm leading-6 text-shell-text-soft">保存后会立即成为插件当前配置，后续任务会按这里的参数执行。</span>
+            <span className="text-sm leading-6 text-shell-text-soft">保存后会立即成为插件当前配置，后续任务会按这里的参数和默认写入模式执行。</span>
           </div>
           <div className="flex w-full flex-wrap gap-3 sm:w-auto">
             <Button className="flex-1 sm:min-w-40 sm:flex-none" disabled={busy} type="button" variant="secondary" onClick={() => void testConnection()}>

@@ -27,6 +27,7 @@ describe('ConfigPageApp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     readPluginConfiguration.mockResolvedValue({
+      DefaultSubtitleWriteMode: 'embedded',
       EnableAutoVideoConvertToMkv: false,
       FfmpegExecutablePath: '/usr/bin/ffmpeg',
       QsvRenderDevicePath: '/dev/dri/renderD129',

@@ -8,7 +8,10 @@ export type UiTone =
   | 'success'
   | 'warning';
 
+export type SubtitleWriteMode = 'embedded' | 'sidecar';
+
 export interface PluginConfiguration {
+  DefaultSubtitleWriteMode: SubtitleWriteMode;
   ServiceBaseUrl: string;
   RequestTimeoutSeconds: number;
   EnableAutoVideoConvertToMkv: boolean;
@@ -54,6 +57,13 @@ export interface EmbeddedSubtitleTrack {
   IsPluginManaged?: boolean;
 }
 
+export interface ExternalSubtitleTrack {
+  FileName?: string;
+  FilePath?: string;
+  Language?: string;
+  Format?: string;
+}
+
 export interface SubtitleCandidate {
   Id: string;
   Name?: string;
@@ -64,6 +74,7 @@ export interface SubtitleCandidate {
   Format?: string;
   Ext?: string;
   FingerprintScore?: number;
+  SidecarFileName?: string;
   TemporarySrtFileName?: string;
 }
 
@@ -82,6 +93,7 @@ export interface MediaPart {
   PartNumber?: number | null;
   MediaPath?: string;
   EmbeddedSubtitles?: EmbeddedSubtitleTrack[];
+  ExternalSubtitles?: ExternalSubtitleTrack[];
 }
 
 export interface ItemPartsPayload {
@@ -103,7 +115,9 @@ export interface OperationResultItem {
   NeedsCompatibilityRepair?: boolean;
   Pipeline?: string;
   MediaPath?: string;
+  WriteMode?: SubtitleWriteMode;
   EmbeddedSubtitle?: EmbeddedSubtitleTrack;
+  ExternalSubtitle?: ExternalSubtitleTrack;
 }
 
 export interface OperationBatchPayload {
@@ -128,6 +142,7 @@ export interface OverlayViewState {
   busy: boolean;
   itemData: ItemPartsPayload | null;
   itemId: string | null;
+  subtitleWriteMode: SubtitleWriteMode;
   lastBatchItems: OperationResultItem[];
   lastLocation: string;
   searchResults: Map<string, SubtitleCandidate[]>;

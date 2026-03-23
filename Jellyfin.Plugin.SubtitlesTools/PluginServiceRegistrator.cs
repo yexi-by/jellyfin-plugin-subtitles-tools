@@ -40,6 +40,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<MkvMetadataIdentityService>();
         serviceCollection.AddSingleton<SubtitleSrtConversionService>();
         serviceCollection.AddSingleton<EmbeddedSubtitleService>();
+        serviceCollection.AddSingleton<ExternalSubtitleService>();
         serviceCollection.AddSingleton<MultipartMediaParserService>();
         serviceCollection.AddSingleton<MultipartSubtitleManagerService>();
         serviceCollection.AddSingleton<PrecomputeMissingHashesScheduledTask>();

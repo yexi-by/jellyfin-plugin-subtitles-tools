@@ -1,4 +1,5 @@
 using System;
+using Jellyfin.Plugin.SubtitlesTools.Models;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.SubtitlesTools.Configuration;
@@ -30,6 +31,11 @@ public class PluginConfiguration : BasePluginConfiguration
     public const int DefaultVideoConvertConcurrency = 1;
 
     /// <summary>
+    /// 默认字幕写入模式。
+    /// </summary>
+    public const string DefaultSubtitleWriteModeValue = SubtitleWriteMode.Embedded;
+
+    /// <summary>
     /// 默认 QSV 渲染设备路径。
     /// </summary>
     public const string DefaultQsvRenderDevicePath = "/dev/dri/renderD128";
@@ -43,6 +49,7 @@ public class PluginConfiguration : BasePluginConfiguration
         RequestTimeoutSeconds = DefaultRequestTimeoutSeconds;
         EnableAutoVideoConvertToMkv = DefaultEnableAutoVideoConvertToMkv;
         VideoConvertConcurrency = DefaultVideoConvertConcurrency;
+        DefaultSubtitleWriteMode = DefaultSubtitleWriteModeValue;
         FfmpegExecutablePath = string.Empty;
         QsvRenderDevicePath = DefaultQsvRenderDevicePath;
     }
@@ -66,6 +73,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// 视频转换并发数。
     /// </summary>
     public int VideoConvertConcurrency { get; set; }
+
+    /// <summary>
+    /// 默认字幕写入模式。
+    /// </summary>
+    public string DefaultSubtitleWriteMode { get; set; }
 
     /// <summary>
     /// FFmpeg 可执行文件路径。
@@ -143,6 +155,16 @@ public class PluginConfiguration : BasePluginConfiguration
         }
 
         return value;
+    }
+
+    /// <summary>
+    /// 规范化默认字幕写入模式。
+    /// </summary>
+    /// <param name="value">原始写入模式。</param>
+    /// <returns>规范化后的模式。</returns>
+    public static string NormalizeSubtitleWriteMode(string? value)
+    {
+        return SubtitleWriteMode.Normalize(value);
     }
 
     /// <summary>

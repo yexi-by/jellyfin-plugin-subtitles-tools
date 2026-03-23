@@ -18,7 +18,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 负责“分段字幕管理页”所需的媒体识别、纳管、兼容修复、字幕搜索、SRT 归一化、内封和删除流程。
+/// 负责“分段字幕管理页”所需的媒体识别、纳管、兼容修复、字幕搜索、SRT 归一化以及内封/外挂写入流程。
 /// 当前版本只认 MKV 元数据，不再依赖任何插件侧哈希归档。
 /// </summary>
 public sealed class MultipartSubtitleManagerService
@@ -32,6 +32,7 @@ public sealed class MultipartSubtitleManagerService
     private readonly SubtitleMetadataService _subtitleMetadataService;
     private readonly SubtitleSrtConversionService _subtitleSrtConversionService;
     private readonly EmbeddedSubtitleService _embeddedSubtitleService;
+    private readonly ExternalSubtitleService _externalSubtitleService;
     private readonly ILogger<MultipartSubtitleManagerService> _logger;
 
     /// <summary>
@@ -47,6 +48,7 @@ public sealed class MultipartSubtitleManagerService
         SubtitleMetadataService subtitleMetadataService,
         SubtitleSrtConversionService subtitleSrtConversionService,
         EmbeddedSubtitleService embeddedSubtitleService,
+        ExternalSubtitleService externalSubtitleService,
         ILogger<MultipartSubtitleManagerService> logger)
     {
         _libraryManager = libraryManager;
@@ -58,6 +60,7 @@ public sealed class MultipartSubtitleManagerService
         _subtitleMetadataService = subtitleMetadataService;
         _subtitleSrtConversionService = subtitleSrtConversionService;
         _embeddedSubtitleService = embeddedSubtitleService;
+        _externalSubtitleService = externalSubtitleService;
         _logger = logger;
     }
 
@@ -243,8 +246,8 @@ public sealed class MultipartSubtitleManagerService
     }
 
     /// <summary>
-    /// 下载指定候选字幕，转成临时 SRT 后写入当前分段的 MKV。
-    /// 执行内封前会先确保当前分段已经完成纳管与兼容修复。
+    /// 下载指定候选字幕，转成临时 SRT 后按模式写入当前分段。
+    /// 执行写入前会先确保当前分段已经完成纳管与兼容修复。
     /// </summary>
     public async Task<ManagedPartDownloadResponseDto> DownloadPartAsync(
         Guid itemId,
@@ -267,21 +270,24 @@ public sealed class MultipartSubtitleManagerService
         var context = await ResolveContextAsync(itemId, cancellationToken).ConfigureAwait(false);
         var part = GetPart(context, partId);
         var traceId = CreateTraceId();
-        var embedResult = await EmbedCandidateAsync(part, request, traceId, cancellationToken).ConfigureAwait(false);
+        var writeMode = ResolveRequestedWriteMode(request.WriteMode);
+        var writeResult = await WriteCandidateAsync(part, request, writeMode, traceId, cancellationToken).ConfigureAwait(false);
         QueueItemRefresh(context.Item);
 
         return new ManagedPartDownloadResponseDto
         {
-            Status = "embedded",
-            Message = "字幕已转为 SRT 并内封到视频。",
-            MediaPath = embedResult.MediaPath,
-            Container = embedResult.Container,
+            Status = writeResult.Status,
+            Message = writeResult.Message,
+            WriteMode = writeMode,
+            MediaPath = writeResult.MediaPath,
+            Container = writeResult.Container,
             IsManaged = true,
-            RiskVerdict = embedResult.RiskVerdict,
-            Pipeline = embedResult.Pipeline,
-            NeedsCompatibilityRepair = embedResult.NeedsCompatibilityRepair,
-            UsedCompatibilityRepairReencode = embedResult.UsedCompatibilityRepairReencode,
-            EmbeddedSubtitle = embedResult.EmbeddedSubtitle
+            RiskVerdict = writeResult.RiskVerdict,
+            Pipeline = writeResult.Pipeline,
+            NeedsCompatibilityRepair = writeResult.NeedsCompatibilityRepair,
+            UsedCompatibilityRepairReencode = writeResult.UsedCompatibilityRepairReencode,
+            EmbeddedSubtitle = writeResult.EmbeddedSubtitle,
+            ExternalSubtitle = writeResult.ExternalSubtitle
         };
     }
 
@@ -319,8 +325,8 @@ public sealed class MultipartSubtitleManagerService
     }
 
     /// <summary>
-    /// 为所有分段分别搜索并内封第一名字幕候选。
-    /// 每个分段都会先完成纳管和兼容修复，再进入字幕搜索与内封。
+    /// 为所有分段分别搜索并写入第一名字幕候选。
+    /// 每个分段都会先完成纳管和兼容修复，再进入字幕搜索与字幕写入。
     /// </summary>
     public async Task<ManagedBatchOperationResponseDto> DownloadBestAsync(
         Guid itemId,
@@ -331,6 +337,7 @@ public sealed class MultipartSubtitleManagerService
 
         var context = await ResolveContextAsync(itemId, cancellationToken).ConfigureAwait(false);
         var traceId = CreateTraceId();
+        var writeMode = ResolveRequestedWriteMode(request.WriteMode);
         var items = new List<ManagedBatchPartResultDto>(context.Group.Parts.Count);
         var queuedRefresh = false;
 
@@ -378,7 +385,7 @@ public sealed class MultipartSubtitleManagerService
                     continue;
                 }
 
-                var embedResult = await EmbedCandidateAsync(
+                var writeResult = await WriteCandidateAsync(
                     part,
                     new ManagedPartDownloadRequestDto
                     {
@@ -386,8 +393,10 @@ public sealed class MultipartSubtitleManagerService
                         Name = bestCandidate.Name,
                         Ext = bestCandidate.Ext,
                         Languages = bestCandidate.Languages,
-                        Language = _subtitleMetadataService.ResolveThreeLetterLanguage(bestCandidate.Languages)
+                        Language = _subtitleMetadataService.ResolveThreeLetterLanguage(bestCandidate.Languages),
+                        WriteMode = writeMode
                     },
+                    writeMode,
                     traceId,
                     cancellationToken).ConfigureAwait(false);
                 queuedRefresh = true;
@@ -396,16 +405,18 @@ public sealed class MultipartSubtitleManagerService
                 {
                     PartId = part.Id,
                     Label = part.Label,
-                    Status = "embedded",
-                    Message = "字幕已转为 SRT 并内封到视频。",
-                    MediaPath = embedResult.MediaPath,
-                    Container = embedResult.Container,
+                    Status = writeResult.Status,
+                    Message = writeResult.Message,
+                    WriteMode = writeMode,
+                    MediaPath = writeResult.MediaPath,
+                    Container = writeResult.Container,
                     IsManaged = true,
-                    RiskVerdict = embedResult.RiskVerdict,
-                    Pipeline = embedResult.Pipeline,
-                    NeedsCompatibilityRepair = embedResult.NeedsCompatibilityRepair,
-                    UsedCompatibilityRepairReencode = embedResult.UsedCompatibilityRepairReencode,
-                    EmbeddedSubtitle = embedResult.EmbeddedSubtitle
+                    RiskVerdict = writeResult.RiskVerdict,
+                    Pipeline = writeResult.Pipeline,
+                    NeedsCompatibilityRepair = writeResult.NeedsCompatibilityRepair,
+                    UsedCompatibilityRepairReencode = writeResult.UsedCompatibilityRepairReencode,
+                    EmbeddedSubtitle = writeResult.EmbeddedSubtitle,
+                    ExternalSubtitle = writeResult.ExternalSubtitle
                 });
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or SubtitlesToolsApiException or FfmpegExecutionException)
@@ -433,7 +444,12 @@ public sealed class MultipartSubtitleManagerService
             QueueItemRefresh(context.Item);
         }
 
-        return BuildBatchResponse("一键全段最佳匹配内封完成。", items, "embedded");
+        return BuildBatchResponse(
+            string.Equals(writeMode, SubtitleWriteMode.Sidecar, StringComparison.Ordinal)
+                ? "一键全段最佳匹配外挂写入完成。"
+                : "一键全段最佳匹配内封完成。",
+            items,
+            writeMode);
     }
 
     private ManagedSubtitleCandidateDto BuildManagedCandidate(FileInfo mediaFile, SubtitleSearchItemDto item)
@@ -453,7 +469,8 @@ public sealed class MultipartSubtitleManagerService
             Score = item.Score,
             FingerprintScore = item.FingerprintScore,
             ExtraName = item.ExtraName,
-            TemporarySrtFileName = $"{Path.GetFileNameWithoutExtension(mediaFile.Name)}.srt"
+            TemporarySrtFileName = $"{Path.GetFileNameWithoutExtension(mediaFile.Name)}.srt",
+            SidecarFileName = _externalSubtitleService.BuildSuggestedSidecarFileName(mediaFile, language, "srt")
         };
     }
 
@@ -461,6 +478,7 @@ public sealed class MultipartSubtitleManagerService
     {
         var inspection = await _mkvMetadataIdentityService.InspectAsync(part.MediaFile.FullName, cancellationToken).ConfigureAwait(false);
         var embeddedSubtitles = await _embeddedSubtitleService.GetEmbeddedSubtitlesAsync(part.MediaFile, cancellationToken).ConfigureAwait(false);
+        var externalSubtitles = _externalSubtitleService.GetExternalSubtitles(part.MediaFile);
         return new ManagedMediaPartDto
         {
             Id = part.Id,
@@ -477,11 +495,28 @@ public sealed class MultipartSubtitleManagerService
             RiskVerdict = inspection.RiskVerdict,
             Pipeline = inspection.Pipeline,
             NeedsCompatibilityRepair = inspection.NeedsCompatibilityRepair,
-            EmbeddedSubtitles = embeddedSubtitles
+            EmbeddedSubtitles = embeddedSubtitles,
+            ExternalSubtitles = externalSubtitles
         };
     }
 
-    private async Task<EmbedCandidateResult> EmbedCandidateAsync(
+    private async Task<WriteCandidateResult> WriteCandidateAsync(
+        MultipartMediaPart part,
+        ManagedPartDownloadRequestDto request,
+        string writeMode,
+        string traceId,
+        CancellationToken cancellationToken)
+    {
+        return string.Equals(writeMode, SubtitleWriteMode.Sidecar, StringComparison.Ordinal)
+            ? await WriteSidecarCandidateAsync(part, request, traceId, cancellationToken).ConfigureAwait(false)
+            : await EmbedCandidateAsync(part, request, traceId, cancellationToken).ConfigureAwait(false);
+    }
+
+    [SuppressMessage(
+        "Security",
+        "CA3003:Review code for file path injection vulnerabilities",
+        Justification = "这里使用的媒体路径来自 EnsureManagedAsync 返回的 Jellyfin 本地媒体文件，已经完成存在性与可管理性校验，不直接信任请求体中的路径。")]
+    private async Task<WriteCandidateResult> EmbedCandidateAsync(
         MultipartMediaPart part,
         ManagedPartDownloadRequestDto request,
         string traceId,
@@ -516,8 +551,10 @@ public sealed class MultipartSubtitleManagerService
                 managedFile.FullName,
                 embeddedSubtitle.StreamIndex);
 
-            return new EmbedCandidateResult
+            return new WriteCandidateResult
             {
+                Status = SubtitleWriteMode.Embedded,
+                Message = "字幕已转为 UTF-8 SRT 并内封到视频。",
                 MediaPath = managedFile.FullName,
                 Container = "mkv",
                 RiskVerdict = management.RiskVerdict,
@@ -525,6 +562,67 @@ public sealed class MultipartSubtitleManagerService
                 NeedsCompatibilityRepair = management.NeedsCompatibilityRepair,
                 UsedCompatibilityRepairReencode = management.UsedCompatibilityRepairReencode,
                 EmbeddedSubtitle = embeddedSubtitle
+            };
+        }
+        finally
+        {
+            if (temporarySrtFile is not null && temporarySrtFile.Exists)
+            {
+                temporarySrtFile.Delete();
+            }
+        }
+    }
+
+    [SuppressMessage(
+        "Security",
+        "CA3003:Review code for file path injection vulnerabilities",
+        Justification = "这里使用的媒体路径来自 EnsureManagedAsync 返回的 Jellyfin 本地媒体文件，已经完成存在性与可管理性校验，不直接信任请求体中的路径。")]
+    private async Task<WriteCandidateResult> WriteSidecarCandidateAsync(
+        MultipartMediaPart part,
+        ManagedPartDownloadRequestDto request,
+        string traceId,
+        CancellationToken cancellationToken)
+    {
+        var management = await _mkvMetadataIdentityService.EnsureManagedAsync(part.MediaFile.FullName, cancellationToken, traceId).ConfigureAwait(false);
+        var managedFile = new FileInfo(management.Identity.MediaPath);
+        var downloadedSubtitle = await _subtitlesToolsApiClient.DownloadSubtitleAsync(request.SubtitleId, cancellationToken, traceId).ConfigureAwait(false);
+
+        FileInfo? temporarySrtFile = null;
+        try
+        {
+            temporarySrtFile = await _subtitleSrtConversionService
+                .ConvertToTemporarySrtAsync(managedFile, downloadedSubtitle, request.Ext, cancellationToken, traceId)
+                .ConfigureAwait(false);
+
+            var externalSubtitle = await _externalSubtitleService
+                .ReplaceExternalSubtitleAsync(
+                    managedFile,
+                    temporarySrtFile,
+                    ResolveRequestLanguage(request),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "trace={TraceId} multipart_sidecar_complete part_id={PartId} subtitle_id={SubtitleId} media_path={MediaPath} subtitle_path={SubtitlePath}",
+                traceId,
+                part.Id,
+                request.SubtitleId,
+                managedFile.FullName,
+                externalSubtitle.FilePath);
+
+            temporarySrtFile = null;
+
+            return new WriteCandidateResult
+            {
+                Status = SubtitleWriteMode.Sidecar,
+                Message = "字幕已转为 UTF-8 SRT 并写成外挂字幕。",
+                MediaPath = managedFile.FullName,
+                Container = NormalizeContainer(managedFile.Extension),
+                RiskVerdict = management.RiskVerdict,
+                Pipeline = management.Pipeline,
+                NeedsCompatibilityRepair = management.NeedsCompatibilityRepair,
+                UsedCompatibilityRepairReencode = management.UsedCompatibilityRepairReencode,
+                ExternalSubtitle = externalSubtitle
             };
         }
         finally
@@ -663,6 +761,11 @@ public sealed class MultipartSubtitleManagerService
         return Guid.NewGuid().ToString("N")[..12];
     }
 
+    private static string ResolveRequestedWriteMode(string? requestedWriteMode)
+    {
+        return SubtitleWriteMode.Normalize(requestedWriteMode ?? Plugin.Instance?.Configuration?.DefaultSubtitleWriteMode);
+    }
+
     /// <summary>
     /// 表示当前管理流程中的媒体上下文。
     /// </summary>
@@ -675,14 +778,17 @@ public sealed class MultipartSubtitleManagerService
     /// <summary>
     /// 表示单次字幕内封结果。
     /// </summary>
-    private sealed class EmbedCandidateResult
+    private sealed class WriteCandidateResult
     {
+        public string Status { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
         public string MediaPath { get; set; } = string.Empty;
         public string Container { get; set; } = string.Empty;
         public string RiskVerdict { get; set; } = string.Empty;
         public string Pipeline { get; set; } = string.Empty;
         public bool NeedsCompatibilityRepair { get; set; }
         public bool UsedCompatibilityRepairReencode { get; set; }
-        public ManagedEmbeddedSubtitleDto EmbeddedSubtitle { get; set; } = new();
+        public ManagedEmbeddedSubtitleDto? EmbeddedSubtitle { get; set; }
+        public ManagedExternalSubtitleDto? ExternalSubtitle { get; set; }
     }
 }

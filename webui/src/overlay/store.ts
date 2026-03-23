@@ -9,7 +9,8 @@ import type {
   OperationResultItem,
   OverlayViewState,
   SearchOperationPayload,
-  SubtitleCandidate
+  SubtitleCandidate,
+  SubtitleWriteMode
 } from '../shared/types';
 
 export interface OverlayStoreState extends OverlayViewState {
@@ -26,6 +27,7 @@ const initialState: OverlayStoreState = {
   isOverlayOpen: false,
   itemData: null,
   itemId: null,
+  subtitleWriteMode: 'embedded',
   lastBatchItems: [],
   lastLocation: '',
   searchResults: new Map<string, SubtitleCandidate[]>(),
@@ -80,6 +82,10 @@ export function setStatus(message: string, tone: OverlayStoreState['statusTone']
   });
 }
 
+export function setSubtitleWriteMode(mode: SubtitleWriteMode): void {
+  patchOverlayState({ subtitleWriteMode: mode });
+}
+
 export async function fetchPartsPayload(itemId: string): Promise<ItemPartsPayload> {
   return requestJson<ItemPartsPayload>(`${API_ROOT}/Items/${itemId}/parts`, 'GET');
 }
@@ -125,7 +131,8 @@ export async function refreshCurrentPageState(forceReload: boolean): Promise<voi
   if (!itemId) {
     replaceOverlayState({
       ...initialState,
-      lastLocation: locationSignature
+      lastLocation: locationSignature,
+      subtitleWriteMode: state.subtitleWriteMode
     });
     return;
   }
@@ -140,6 +147,7 @@ export async function refreshCurrentPageState(forceReload: boolean): Promise<voi
       isOverlayOpen: state.isOverlayOpen,
       itemId,
       lastLocation: locationSignature,
+      subtitleWriteMode: state.subtitleWriteMode,
       statusMessage: extractErrorMessage(error),
       statusTone: 'error'
     });
@@ -204,6 +212,12 @@ export function applyOperationResultToPart(partId: string | undefined, result: O
       part.EmbeddedSubtitles = [...nonPluginTracks, result.EmbeddedSubtitle];
     }
 
+    if (result.ExternalSubtitle) {
+      const nextTrack = result.ExternalSubtitle;
+      const remainingTracks = (part.ExternalSubtitles ?? []).filter(track => track.FilePath !== nextTrack.FilePath);
+      part.ExternalSubtitles = [...remainingTracks, nextTrack];
+    }
+
     return part;
   });
 }
@@ -217,7 +231,7 @@ export function applyDeleteResultToPart(partId: string, deletedStreamIndex: numb
 
 export function applyBatchResults(items: OperationResultItem[]): void {
   items.forEach(item => {
-    if (item.IsManaged === true || item.Status === 'converted' || item.Status === 'embedded') {
+    if (item.IsManaged === true || item.Status === 'converted' || item.Status === 'embedded' || item.Status === 'sidecar') {
       applyOperationResultToPart(item.PartId, item);
     }
   });
@@ -225,7 +239,9 @@ export function applyBatchResults(items: OperationResultItem[]): void {
 
 export function createBatchRefreshValidator(items: OperationResultItem[]): (payload: ItemPartsPayload) => boolean {
   return payload => {
-    const successfulItems = items.filter(item => item.IsManaged === true || item.Status === 'converted' || item.Status === 'embedded');
+    const successfulItems = items.filter(item => {
+      return item.IsManaged === true || item.Status === 'converted' || item.Status === 'embedded' || item.Status === 'sidecar';
+    });
     if (successfulItems.length === 0) {
       return true;
     }
@@ -263,6 +279,12 @@ export function createBatchRefreshValidator(items: OperationResultItem[]): (payl
       if (item.Status === 'embedded' && item.EmbeddedSubtitle) {
         return (part.EmbeddedSubtitles ?? []).some(track => {
           return track.Title === item.EmbeddedSubtitle?.Title && track.Language === item.EmbeddedSubtitle?.Language;
+        });
+      }
+
+      if (item.Status === 'sidecar' && item.ExternalSubtitle) {
+        return (part.ExternalSubtitles ?? []).some(track => {
+          return track.FilePath === item.ExternalSubtitle?.FilePath;
         });
       }
 
@@ -305,6 +327,12 @@ export function createSinglePartRefreshValidator(partId: string, expectedResult:
     if (expectedResult.EmbeddedSubtitle) {
       return (part.EmbeddedSubtitles ?? []).some(track => {
         return track.Title === expectedResult.EmbeddedSubtitle?.Title && track.Language === expectedResult.EmbeddedSubtitle?.Language;
+      });
+    }
+
+    if (expectedResult.ExternalSubtitle) {
+      return (part.ExternalSubtitles ?? []).some(track => {
+        return track.FilePath === expectedResult.ExternalSubtitle?.FilePath;
       });
     }
 
@@ -352,13 +380,19 @@ export async function convertGroup(itemId: string): Promise<OperationBatchPayloa
   return requestJson<OperationBatchPayload>(`${API_ROOT}/Items/${itemId}/convert-group`, 'POST', {});
 }
 
-export async function downloadCandidate(itemId: string, part: MediaPart, candidate: SubtitleCandidate): Promise<OperationResultItem> {
+export async function downloadCandidate(
+  itemId: string,
+  part: MediaPart,
+  candidate: SubtitleCandidate,
+  writeMode: SubtitleWriteMode
+): Promise<OperationResultItem> {
   return requestJson<OperationResultItem>(`${API_ROOT}/Items/${itemId}/parts/${part.Id}/download`, 'POST', {
     Ext: candidate.Ext,
     Language: candidate.Language,
     Languages: candidate.Languages,
     Name: candidate.Name,
-    SubtitleId: candidate.Id
+    SubtitleId: candidate.Id,
+    WriteMode: writeMode
   });
 }
 
@@ -368,8 +402,10 @@ export async function deletePartEmbeddedSubtitle(itemId: string, part: MediaPart
   });
 }
 
-export async function downloadBest(itemId: string): Promise<OperationBatchPayload> {
-  return requestJson<OperationBatchPayload>(`${API_ROOT}/Items/${itemId}/download-best`, 'POST', {});
+export async function downloadBest(itemId: string, writeMode: SubtitleWriteMode): Promise<OperationBatchPayload> {
+  return requestJson<OperationBatchPayload>(`${API_ROOT}/Items/${itemId}/download-best`, 'POST', {
+    WriteMode: writeMode
+  });
 }
 
 export function setSearchResults(partId: string, results: SubtitleCandidate[]): void {
