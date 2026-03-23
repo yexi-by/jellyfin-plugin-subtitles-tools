@@ -19,7 +19,7 @@ public sealed class ExternalSubtitleServiceTests
     public void BuildSuggestedSidecarFileName_ShouldUseNormalizedLanguageSuffix()
     {
         var service = new ExternalSubtitleService(new SubtitleMetadataService());
-        var mediaFile = new FileInfo(@"C:\media\Movie.mkv");
+        var mediaFile = new FileInfo(Path.Combine(Path.GetTempPath(), "Movie.mkv"));
 
         var chineseFileName = service.BuildSuggestedSidecarFileName(mediaFile, "zh-CN", "srt");
         var unknownFileName = service.BuildSuggestedSidecarFileName(mediaFile, "unknown", "srt");
