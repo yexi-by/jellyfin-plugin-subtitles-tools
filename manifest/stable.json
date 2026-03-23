@@ -11,7 +11,7 @@
     "versions": [
       {
         "version": "0.7.2.1",
-        "changelog": "修复字幕控制台弹层显隐回归，解决点击“字幕控制台”按钮后界面仍保持隐藏、看起来像完全打不开的问题；保留手机、平板与横竖屏响应式布局改造，并让新版脚本随版本号重新下发，减少旧缓存导致的前端失效现象。",
+        "changelog": "新增字幕写入双模式：可选内封到 MKV，或直接生成同目录外挂字幕；设置页支持默认写入模式，详情页字幕控制台支持即时切换、外挂字幕列表展示和动态任务反馈；同时补齐对应前后端测试与发布链兼容性修复。",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.2.1/Jellyfin.Plugin.SubtitlesTools_0.7.2.1.zip",
         "checksum": "EB89AA23A1ECA210AD8126A4E8B3907E",
