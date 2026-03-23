@@ -1,6 +1,5 @@
 import { startTransition, useEffect, useEffectEvent, useState, type JSX } from 'react';
 import {
-  Badge,
   Button,
   ConnectionMetrics,
   FieldShell,
@@ -16,8 +15,7 @@ import {
   buildErrorConnectionStatus,
   buildIdleConnectionStatus,
   buildLoadingConnectionStatus,
-  buildSuccessConnectionStatus,
-  getSubtitleWriteModeLabel
+  buildSuccessConnectionStatus
 } from '../shared/formatters';
 import {
   hideLoading,
@@ -41,7 +39,7 @@ const defaultConfiguration: PluginConfiguration = {
 };
 
 function textInputClassName(): string {
-  return 'w-full rounded-shell-sm border border-white/10 bg-shell-bg-soft px-4 py-3 text-sm text-shell-text outline-none transition placeholder:text-shell-text-faint focus:border-shell-accent/45 focus:ring-2 focus:ring-shell-accent/15';
+  return 'w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-gray-200 outline-none transition focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50';
 }
 
 function normalizeWriteMode(value: string | undefined): SubtitleWriteMode {
@@ -71,7 +69,7 @@ export function ConfigPageApp(): JSX.Element {
         setConnectionStatus(buildIdleConnectionStatus());
       });
     } catch {
-      showError('加载插件配置失败。');
+      showError('加载配置失败');
     } finally {
       hideLoading();
     }
@@ -90,9 +88,8 @@ export function ConfigPageApp(): JSX.Element {
       const response = await requestJson<ConnectionHealthPayload>(`${API_ROOT}/TestConnection`, 'POST', configuration);
       setConnectionStatus(buildSuccessConnectionStatus(response));
     } catch (error) {
-      const message = extractErrorMessage(error);
-      setConnectionStatus(buildErrorConnectionStatus(message));
-      showError(message);
+      setConnectionStatus(buildErrorConnectionStatus());
+      showError(extractErrorMessage(error));
     } finally {
       setBusy(false);
       hideLoading();
@@ -119,57 +116,25 @@ export function ConfigPageApp(): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(208,108,77,0.18),transparent_34%),radial-gradient(circle_at_top_left,rgba(80,119,154,0.16),transparent_32%),linear-gradient(180deg,rgba(12,16,23,0.98),rgba(15,20,27,1))] text-shell-text">
-      <div className="mx-auto grid max-w-[1320px] gap-6 px-4 py-6 md:px-8 xl:px-10">
-        <section className="relative overflow-hidden rounded-shell-xl border border-shell-border bg-[linear-gradient(145deg,rgba(24,31,42,0.96),rgba(18,23,32,0.98))] p-6 shadow-shell-strong md:p-10">
-          <div className="absolute right-[-5rem] top-[-6rem] h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(208,108,77,0.28),transparent_70%)]" />
-          <div className="absolute bottom-[-8rem] left-[-6rem] h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(80,119,154,0.22),transparent_70%)]" />
-          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.95fr)]">
-            <div className="grid gap-4">
-              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-shell-text/70">Subtitles Tools 控制台</div>
-              <h1 className="max-w-[48rem] font-serif text-[clamp(2rem,4vw,3.35rem)] leading-[1.02]">把字幕搜索、纳管修复与写入方式收进一套统一前端工作台。</h1>
-              <p className="max-w-[44rem] text-sm leading-8 text-shell-text-soft">
-                当前配置页聚焦 Python 服务连接、自动纳管策略、字幕默认写入模式与转码执行环境说明。保存前先完成连通性检测，可以更快定位 FFmpeg、QSV 和字幕源问题。
-              </p>
-              <div className="flex flex-wrap gap-2.5">
-                <Badge tone="accent">深色影院控制台</Badge>
-                <Badge>Intel QSV 优先</Badge>
-                <Badge>本地媒体专用</Badge>
-                <Badge>内封 / 外挂双模式</Badge>
-              </div>
-            </div>
-            <div className="grid gap-4">
-              <Panel className="gap-4 bg-white/4">
-                <SectionHeading title="处理流程" description="配置完成后，字幕工作流会始终遵循同一条操作顺序。" />
-                <ol className="grid gap-3">
-                  {[
-                    ['01', '先纳管与兼容修复', '先确认容器、编码与 MKV 元数据是否已经处于插件可识别状态。'],
-                    ['02', '再搜索与匹配', '依赖 Python 服务按 CID / GCID / 文件名组合查找候选字幕。'],
-                    ['03', '统一转为 UTF-8 SRT', '候选字幕会先归一化为兼容性更好的 UTF-8 SRT，再进入写入阶段。'],
-                    ['04', '按模式写入字幕', '可以写回 MKV 形成内封，也可以直接生成同目录外挂字幕文件。']
-                  ].map(([index, title, description]) => (
-                    <li key={index} className="grid grid-cols-[auto_1fr] gap-3">
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[linear-gradient(135deg,rgba(208,108,77,0.24),rgba(80,119,154,0.22))] text-xs font-bold text-shell-text">{index}</span>
-                      <div className="grid gap-1">
-                        <strong className="text-sm font-semibold text-shell-text">{title}</strong>
-                        <span className="text-[0.84rem] leading-6 text-shell-text-soft">{description}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </Panel>
-            </div>
-          </div>
-        </section>
+    <div className="min-h-screen bg-[#121212] text-gray-200">
+      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
+        <header className="mb-8 sm:mb-10">
+          <h1 className="text-2xl font-semibold text-gray-100 sm:text-3xl">字幕工具设置</h1>
+          <p className="mt-2 text-sm text-gray-400">连接字幕服务，设置默认保存方式。</p>
+        </header>
 
-        <div className="grid gap-5 xl:grid-cols-12">
-          <Panel className="xl:col-span-7">
-            <SectionHeading title="服务连接与连通性检测" description="这里定义 Python 服务地址和请求超时。建议先完成环境检测，再保存当前参数。" />
+        <div className="flex flex-col gap-6">
+          <Panel>
+            <SectionHeading title="服务连接" description="填写字幕服务地址，并先做一次连接检测。" />
             <div className="grid gap-4 md:grid-cols-2">
-              <FieldShell label="Python 服务地址" description={<>示例：<code className="rounded-full bg-shell-cool/20 px-2 py-0.5 text-xs text-shell-text">http://127.0.0.1:8055</code>。插件会用这个地址访问字幕搜索服务。</>}>
-                <input className={textInputClassName()} value={configuration.ServiceBaseUrl} onChange={event => setConfiguration(current => ({ ...current, ServiceBaseUrl: event.target.value }))} />
+              <FieldShell label="服务地址" description="例如：http://127.0.0.1:8055">
+                <input
+                  className={textInputClassName()}
+                  value={configuration.ServiceBaseUrl}
+                  onChange={event => setConfiguration(current => ({ ...current, ServiceBaseUrl: event.target.value }))}
+                />
               </FieldShell>
-              <FieldShell label="请求超时（秒）" description="建议保持 10 秒。跨机器或低性能 NAS 环境可以适当调高。">
+              <FieldShell label="请求超时（秒）">
                 <input
                   className={textInputClassName()}
                   max={120}
@@ -180,55 +145,70 @@ export function ConfigPageApp(): JSX.Element {
                 />
               </FieldShell>
             </div>
-            <StatusBanner label={connectionStatus.label} message={connectionStatus.message} title={connectionStatus.title} tone={connectionStatus.tone} />
-            <ConnectionMetrics metrics={connectionStatus.details} />
+
+            <div className="mt-2 border-t border-white/5 pt-4">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="text-sm font-medium text-gray-200">连接检测</span>
+                <Button className="w-full sm:w-auto" size="sm" disabled={busy} type="button" variant="secondary" onClick={() => void testConnection()}>
+                  测试连接
+                </Button>
+              </div>
+              <StatusBanner
+                label={connectionStatus.label}
+                message={connectionStatus.message}
+                title={connectionStatus.title}
+                tone={connectionStatus.tone}
+              />
+              <div className="mt-3">
+                <ConnectionMetrics metrics={connectionStatus.details} />
+              </div>
+            </div>
           </Panel>
 
-          <Panel className="xl:col-span-5">
-            <SectionHeading title="处理策略" description="这些选项决定插件偏向什么样的写入结果，以及是否自动纳管新入库媒体。" />
-            <FieldShell label="默认字幕写入模式" description={<>当前默认模式：<strong className="text-shell-text">{getSubtitleWriteModeLabel(configuration.DefaultSubtitleWriteMode)}</strong>。详情页里仍然可以临时切换，不会强制写死。</>}>
-              <WriteModeSwitch mode={configuration.DefaultSubtitleWriteMode} onChange={mode => setConfiguration(current => ({ ...current, DefaultSubtitleWriteMode: mode }))} />
-            </FieldShell>
-            <label className="grid gap-3 rounded-shell-md border border-white/8 bg-white/4 p-4">
-              <span className="flex items-start gap-3">
+          <Panel>
+            <SectionHeading title="常规设置" description="设置字幕默认保存方式和自动处理行为。" />
+            <div className="grid gap-6">
+              <FieldShell
+                label="默认保存方式"
+                description="写入视频会把字幕保存进视频文件；另存字幕会在同目录生成字幕文件。"
+              >
+                <div className="w-full max-w-xs">
+                  <WriteModeSwitch
+                    mode={configuration.DefaultSubtitleWriteMode}
+                    onChange={mode => setConfiguration(current => ({ ...current, DefaultSubtitleWriteMode: mode }))}
+                  />
+                </div>
+              </FieldShell>
+
+              <label className="flex items-start gap-3">
                 <input
                   checked={configuration.EnableAutoVideoConvertToMkv}
-                  className="mt-1 h-4 w-4 accent-[var(--color-shell-accent)]"
+                  className="mt-1 h-4 w-4 rounded border-gray-600 bg-black/20 text-blue-500 focus:ring-blue-500/50"
                   type="checkbox"
                   onChange={event => setConfiguration(current => ({ ...current, EnableAutoVideoConvertToMkv: event.target.checked }))}
                 />
-                <span className="text-sm font-semibold leading-6 text-shell-text">新视频入库后自动纳管并修复安卓硬解兼容</span>
-              </span>
-              <span className="text-[0.82rem] leading-6 text-shell-text-soft">默认开启。新文件若已是 MKV，则补写 CID / GCID 到 MKV 元数据；若命中高风险编码或容器，则优先走 Intel QSV 修复为 H.264 + AAC + MKV。</span>
-            </label>
-            <FieldShell label="视频转换并发数" description="默认 1。视频转换是重 I/O 操作，网络盘和机械盘不建议设置过高。">
-              <input
-                className={textInputClassName()}
-                max={4}
-                min={1}
-                type="number"
-                value={configuration.VideoConvertConcurrency}
-                onChange={event => setConfiguration(current => ({ ...current, VideoConvertConcurrency: Number.parseInt(event.target.value, 10) || 1 }))}
-              />
-            </FieldShell>
-            <ul className="grid gap-2">
-              {[
-                '默认外挂更适合 NAS，字幕写入只会生成同目录字幕文件，不需要重写整个 MKV。',
-                '默认内封更适合长期归档，成功后客户端不再依赖同目录外挂字幕文件。',
-                '写入模式只影响“下载字幕后怎么落盘”，不会跳过前面的纳管和兼容修复。'
-              ].map(item => (
-                <li key={item} className="grid grid-cols-[auto_1fr] gap-3 text-sm leading-7 text-shell-text-soft">
-                  <span className="text-shell-accent">•</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-200">自动优化播放兼容性</span>
+                  <span className="text-xs text-gray-500">在需要时先处理容易导致播放异常的格式问题。</span>
+                </div>
+              </label>
+            </div>
           </Panel>
 
-          <Panel className="xl:col-span-7">
-            <SectionHeading title="执行环境" description="插件优先探测 Jellyfin 自带 FFmpeg，再回退到系统 PATH。QSV 设备路径用于 Linux 环境的存在性校验与转码执行。" />
+          <Panel>
+            <SectionHeading title="高级设置" description="不确定时保持默认即可。" />
             <div className="grid gap-4 md:grid-cols-2">
-              <FieldShell label="FFmpeg 可执行文件路径（可选）" description="留空时优先自动探测 Jellyfin 自带 FFmpeg，再回退到系统 PATH。">
+              <FieldShell label="转换并发数">
+                <input
+                  className={textInputClassName()}
+                  max={4}
+                  min={1}
+                  type="number"
+                  value={configuration.VideoConvertConcurrency}
+                  onChange={event => setConfiguration(current => ({ ...current, VideoConvertConcurrency: Number.parseInt(event.target.value, 10) || 1 }))}
+                />
+              </FieldShell>
+              <FieldShell label="FFmpeg 路径（留空自动探测）">
                 <input
                   className={textInputClassName()}
                   placeholder="/usr/lib/jellyfin-ffmpeg/ffmpeg"
@@ -236,7 +216,7 @@ export function ConfigPageApp(): JSX.Element {
                   onChange={event => setConfiguration(current => ({ ...current, FfmpegExecutablePath: event.target.value }))}
                 />
               </FieldShell>
-              <FieldShell label="Intel QSV 渲染设备路径" description={<>默认使用 <code className="rounded-full bg-shell-cool/20 px-2 py-0.5 text-xs text-shell-text">/dev/dri/renderD128</code>。当前只支持 Intel QSV，不提供 VAAPI 或 CPU 兜底。</>}>
+              <FieldShell label="QSV 设备路径">
                 <input
                   className={textInputClassName()}
                   placeholder="/dev/dri/renderD128"
@@ -246,37 +226,12 @@ export function ConfigPageApp(): JSX.Element {
               </FieldShell>
             </div>
           </Panel>
-
-          <Panel className="xl:col-span-5">
-            <SectionHeading title="使用提示" description="这套插件围绕“媒体自治”和“安卓端硬解兼容性”组织字幕工作流。明确边界，能减少误判和重复处理。" />
-            <ul className="grid gap-2">
-              {[
-                '插件先看 MKV 元数据，再决定是否已纳管，不依赖外挂文件名推断。',
-                '搜索和写入字幕前，会优先确认视频已经纳管，并对高风险片段先做兼容修复。',
-                '如果只是批量补齐旧媒体，优先走计划任务统一处理，再到详情页做单片微调。'
-              ].map(item => (
-                <li key={item} className="grid grid-cols-[auto_1fr] gap-3 text-sm leading-7 text-shell-text-soft">
-                  <span className="text-shell-accent">•</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </Panel>
         </div>
 
-        <div className="sticky bottom-3 flex flex-wrap items-center justify-between gap-4 rounded-shell-lg border border-shell-border-strong bg-[rgba(15,20,27,0.9)] p-4 shadow-shell-soft backdrop-blur-md">
-          <div className="grid gap-1">
-            <strong className="text-sm font-semibold text-shell-text">建议顺序：先测试连接，再保存配置</strong>
-            <span className="text-sm leading-6 text-shell-text-soft">保存后会立即成为插件当前配置，后续任务会按这里的参数和默认写入模式执行。</span>
-          </div>
-          <div className="flex w-full flex-wrap gap-3 sm:w-auto">
-            <Button className="flex-1 sm:min-w-40 sm:flex-none" disabled={busy} type="button" variant="secondary" onClick={() => void testConnection()}>
-              测试连接
-            </Button>
-            <Button className="flex-1 sm:min-w-40 sm:flex-none" disabled={busy} type="button" variant="primary" onClick={() => void saveConfigurationValues()}>
-              保存
-            </Button>
-          </div>
+        <div className="mt-8 flex justify-stretch gap-3 sm:justify-end">
+          <Button className="w-full sm:w-auto" disabled={busy} type="button" variant="primary" onClick={() => void saveConfigurationValues()}>
+            保存设置
+          </Button>
         </div>
       </div>
     </div>

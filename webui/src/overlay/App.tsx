@@ -12,18 +12,17 @@ import {
 import { getFileNameFromPath } from '../shared/dom';
 import {
   getBatchStatusText,
+  getBatchSummaryMessage,
   getBatchTone,
   getCompatibilityStatusText,
   getCompatibilityTone,
+  getDefaultOverlayStatus,
   getItemMetrics,
   getManagedStatusText,
   getManagedStatusTone,
-  getPartSelectionSummary,
-  getStatusLabel,
-  getStatusTitle,
   getSubtitleWriteModeLabel
 } from '../shared/formatters';
-import type { MediaPart, OperationResultItem, SubtitleCandidate, SubtitleWriteMode } from '../shared/types';
+import type { EmbeddedSubtitleTrack, ExternalSubtitleTrack, MediaPart, OperationResultItem, SubtitleCandidate, SubtitleWriteMode } from '../shared/types';
 import type { OverlayStoreState } from './store';
 
 interface OverlayActions {
@@ -47,139 +46,130 @@ function CurrentPartCard({
   writeMode: SubtitleWriteMode;
 }): JSX.Element {
   if (!part) {
-    return <EmptyState title="当前没有可展示的分段。" description="先在左侧选择一个可管理分段，再查看当前概览。" />;
+    return <EmptyState title="还没有选择文件" description="先选择一个文件，再开始处理。" />;
   }
 
-  const pipeline = part.Pipeline || '尚未写入流水线';
-  const partNumber = part.PartNumber !== null && part.PartNumber !== undefined ? `第 ${part.PartNumber} 段` : '未编号';
-  const writeModeLabel = getSubtitleWriteModeLabel(writeMode);
+  const embeddedCount = part.EmbeddedSubtitles?.length ?? 0;
+  const externalCount = part.ExternalSubtitles?.length ?? 0;
 
   return (
-    <article className="grid gap-4 rounded-shell-lg border border-white/8 bg-[linear-gradient(145deg,rgba(243,241,236,0.04),rgba(80,119,154,0.08))] p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid gap-2">
-          <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-shell-text/62">{part.Label}</span>
-          <h4 className="break-all text-lg font-semibold leading-7 text-shell-text">{part.FileName || getFileNameFromPath(part.MediaPath)}</h4>
-          <p className="text-sm leading-7 text-shell-text-soft">
-            插件会优先完成纳管与兼容性判断，再决定是否继续搜索字幕，并按当前模式写入{writeModeLabel}。
-          </p>
+    <article className="flex flex-col gap-4 rounded-xl border border-white/5 bg-white/5 p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <h4 className="text-base font-medium text-gray-100">{part.Label || '当前文件'}</h4>
+          <p className="mt-1 break-all text-xs text-gray-500">{part.FileName || getFileNameFromPath(part.MediaPath)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge>{(part.Container || 'unknown').toUpperCase()}</Badge>
           <Badge tone={getManagedStatusTone(part)}>{getManagedStatusText(part)}</Badge>
           <Badge tone={getCompatibilityTone(part)}>{getCompatibilityStatusText(part)}</Badge>
-          <Badge tone="accent">{writeModeLabel}</Badge>
-          <Badge tone={part.Pipeline ? 'accent' : 'neutral'}>{pipeline}</Badge>
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[
-          ['分段类型', part.PartKind || '未标记'],
-          ['分段编号', partNumber],
-          ['媒体路径', part.MediaPath || '未返回路径'],
-          ['当前流水线', pipeline]
-        ].map(([label, value]) => (
-          <div key={label} className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
-            <span className="text-xs text-shell-text/62">{label}</span>
-            <strong className="break-all text-sm leading-6 text-shell-text">{value}</strong>
-          </div>
-        ))}
+
+      <div className="grid gap-3 rounded-lg border border-white/5 bg-black/20 p-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">保存方式</span>
+          <span className="text-sm font-medium text-gray-200">{getSubtitleWriteModeLabel(writeMode)}</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">已有字幕</span>
+          <span className="text-sm font-medium text-gray-200">{embeddedCount + externalCount} 条</span>
+        </div>
       </div>
-      <p className="text-sm leading-7 text-shell-text-soft">
-        当前插件只根据视频自身的 MKV 元数据判断是否已纳管。若分段仍命中高风险硬解规则，建议优先执行 MKV 转换修复。
-      </p>
+
+      <details className="rounded-lg border border-white/5 bg-black/20">
+        <summary className="cursor-pointer list-none px-3 py-3 text-sm font-medium text-gray-200 [&::-webkit-details-marker]:hidden">
+          查看技术信息
+        </summary>
+        <div className="grid gap-3 border-t border-white/5 px-3 py-3 sm:grid-cols-2">
+          <InfoField label="容器" value={(part.Container || '-').toUpperCase()} />
+          <InfoField label="风险判断" value={part.RiskVerdict || '等待检查'} />
+          <InfoField label="文件路径" value={part.MediaPath || '-'} />
+          <InfoField label="字幕轨道数" value={String(embeddedCount + externalCount)} />
+        </div>
+      </details>
     </article>
   );
 }
 
-function EmbeddedSubtitleList({
-  onDelete,
-  part
-}: {
-  onDelete: (streamIndex: number) => Promise<void>;
-  part: MediaPart | null;
-}): JSX.Element {
-  const tracks = part?.EmbeddedSubtitles ?? [];
-  if (tracks.length === 0) {
-    return (
-      <EmptyState
-        title="当前还没有内封字幕流。"
-        description="选择内封模式下载候选字幕后，这里会展示当前分段已经写入 MKV 的字幕轨道。"
-      />
-    );
-  }
-
+function InfoField({ label, value }: { label: string; value: string }): JSX.Element {
   return (
-    <div className="grid gap-3">
-      {tracks.map(track => (
-        <article key={track.StreamIndex} className="grid gap-4 rounded-shell-lg border border-white/8 bg-white/4 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="grid gap-2">
-              <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-shell-text/62">字幕流 #{track.StreamIndex}</span>
-              <h4 className="text-lg font-semibold text-shell-text">{track.Title || `字幕流 #${track.StreamIndex}`}</h4>
-              <p className="text-sm leading-7 text-shell-text-soft">这条字幕轨已经存在于当前分段的 MKV 容器中。</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge tone={track.IsPluginManaged ? 'success' : 'neutral'}>{track.IsPluginManaged ? '插件写入' : '现有轨道'}</Badge>
-              <Badge>{track.Language || 'und'}</Badge>
-              <Badge tone="accent">{(track.Format || 'srt').toUpperCase()}</Badge>
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
-              <span className="text-xs text-shell-text/62">绝对流索引</span>
-              <strong className="text-sm text-shell-text">{track.StreamIndex}</strong>
-            </div>
-            <div className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
-              <span className="text-xs text-shell-text/62">字幕流序号</span>
-              <strong className="text-sm text-shell-text">{track.SubtitleStreamIndex ?? '未返回'}</strong>
-            </div>
-          </div>
-          {track.IsPluginManaged ? (
-            <div className="flex flex-wrap gap-3">
-              <Button type="button" variant="danger" onClick={() => void onDelete(track.StreamIndex)}>
-                删除这条内封字幕
-              </Button>
-            </div>
-          ) : null}
-        </article>
-      ))}
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-gray-500">{label}</span>
+      <span className="break-all text-sm text-gray-300">{value}</span>
     </div>
   );
 }
 
-function ExternalSubtitleList({ part }: { part: MediaPart | null }): JSX.Element {
-  const tracks = part?.ExternalSubtitles ?? [];
-  if (tracks.length === 0) {
-    return (
-      <EmptyState
-        title="当前还没有匹配到外挂字幕。"
-        description="选择外挂模式下载候选字幕后，插件会在同目录生成 SRT 文件，Jellyfin 会按文件名自动识别。"
-      />
-    );
+function SubtitleTrackRow({
+  action,
+  actionLabel,
+  badges,
+  meta,
+  title
+}: {
+  action?: () => void;
+  actionLabel?: string;
+  badges: JSX.Element[];
+  meta: string;
+  title: string;
+}): JSX.Element {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-white/5 bg-white/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="break-all text-sm font-medium text-gray-200 sm:break-normal">{title}</span>
+          {badges}
+        </div>
+        <span className="mt-1 block text-xs text-gray-500">{meta}</span>
+      </div>
+      {action && actionLabel ? (
+        <Button className="w-full sm:w-auto" type="button" variant="tertiary" onClick={action}>
+          {actionLabel}
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function SubtitleList({
+  embedded,
+  external,
+  onDelete
+}: {
+  embedded: EmbeddedSubtitleTrack[] | undefined;
+  external: ExternalSubtitleTrack[] | undefined;
+  onDelete: (streamIndex: number) => Promise<void>;
+}): JSX.Element {
+  const embeddedTracks = embedded ?? [];
+  const externalTracks = external ?? [];
+  const hasSubtitles = embeddedTracks.length > 0 || externalTracks.length > 0;
+
+  if (!hasSubtitles) {
+    return <EmptyState title="当前文件还没有字幕" description="先搜索字幕，再选择保存方式。" />;
   }
 
   return (
-    <div className="grid gap-3">
-      {tracks.map(track => (
-        <article key={track.FilePath || track.FileName} className="grid gap-4 rounded-shell-lg border border-white/8 bg-white/4 p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="grid gap-2">
-              <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-shell-text/62">外挂字幕</span>
-              <h4 className="break-all text-lg font-semibold leading-7 text-shell-text">{track.FileName || '未命名外挂字幕'}</h4>
-              <p className="text-sm leading-7 text-shell-text-soft">这条字幕文件已经写入当前媒体目录，Jellyfin 会按文件名规则自动识别。</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge tone="success">同目录文件</Badge>
-              <Badge>{track.Language || 'und'}</Badge>
-              <Badge tone="accent">{(track.Format || 'srt').toUpperCase()}</Badge>
-            </div>
-          </div>
-          <div className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
-            <span className="text-xs text-shell-text/62">文件路径</span>
-            <strong className="break-all text-sm leading-6 text-shell-text">{track.FilePath || '未返回路径'}</strong>
-          </div>
-        </article>
+    <div className="flex flex-col gap-3">
+      {embeddedTracks.map(track => (
+        <SubtitleTrackRow
+          key={`embedded-${track.StreamIndex}`}
+          action={track.IsPluginManaged ? () => void onDelete(track.StreamIndex) : undefined}
+          actionLabel={track.IsPluginManaged ? '删除' : undefined}
+          badges={[
+            <Badge key="kind" tone="neutral">视频内字幕</Badge>,
+            ...(track.IsPluginManaged ? [<Badge key="managed" tone="success">由本工具添加</Badge>] : [])
+          ]}
+          meta={`语言：${track.Language || '未知'} · 格式：${(track.Format || 'srt').toUpperCase()}`}
+          title={track.Title || `字幕轨道 #${track.StreamIndex}`}
+        />
+      ))}
+      {externalTracks.map(track => (
+        <SubtitleTrackRow
+          key={`external-${track.FilePath || track.FileName}`}
+          badges={[<Badge key="kind" tone="neutral">外挂字幕</Badge>]}
+          meta={`语言：${track.Language || '未知'} · 格式：${(track.Format || 'srt').toUpperCase()}`}
+          title={track.FileName || '外挂字幕'}
+        />
       ))}
     </div>
   );
@@ -195,52 +185,34 @@ function CandidateList({
   writeMode: SubtitleWriteMode;
 }): JSX.Element {
   if (candidates.length === 0) {
-    return <EmptyState title="当前还没有搜索结果。" description="点击“搜索当前分段”后，这里会展示候选字幕与匹配分数。" />;
+    return <EmptyState title="还没有字幕结果" description="点击“搜索当前文件”开始查找。" />;
   }
 
-  const writeModeLabel = getSubtitleWriteModeLabel(writeMode);
+  const actionLabel = getSubtitleWriteModeLabel(writeMode);
 
   return (
-    <div className="grid gap-3">
+    <div className="flex flex-col gap-3">
       {candidates.map(candidate => {
-        const languages = candidate.Languages?.length ? candidate.Languages.join(' / ') : candidate.Language || 'und';
-        const fingerprintScore = Number.isFinite(candidate.FingerprintScore) ? candidate.FingerprintScore!.toFixed(2) : '-';
+        const score = typeof candidate.Score === 'number' || typeof candidate.Score === 'string' ? String(candidate.Score) : '-';
+        const language = candidate.Language || candidate.Languages?.join(', ') || '未知';
+        const format = (candidate.Format || candidate.Ext || 'srt').toUpperCase();
 
         return (
-          <article key={candidate.Id} className="grid gap-4 rounded-shell-lg border border-white/8 bg-white/4 p-5">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="grid gap-2">
-                <span className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-shell-text/62">候选字幕</span>
-                <h4 className="text-lg font-semibold leading-7 text-shell-text">{candidate.DisplayName || candidate.Name || '未命名候选字幕'}</h4>
-                <p className="text-sm leading-7 text-shell-text-soft">
-                  候选项会先转为 UTF-8 SRT，再按当前模式写入{writeModeLabel}。
-                </p>
-              </div>
-              <div className="grid place-items-center rounded-shell-lg bg-[linear-gradient(145deg,rgba(208,108,77,0.18),rgba(80,119,154,0.18))] px-4 py-3 text-center text-shell-text">
-                <strong className="text-2xl leading-none">{candidate.Score ?? '-'}</strong>
-                <span className="mt-1 text-[0.68rem] font-bold uppercase tracking-[0.12em] text-shell-text/70">匹配分</span>
+          <div key={candidate.Id} className="flex flex-col gap-3 rounded-lg border border-white/5 bg-white/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <span className="block break-all text-sm font-medium text-gray-200">
+                {candidate.DisplayName || candidate.Name || '未知字幕'}
+              </span>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                <span className="rounded bg-black/20 px-1.5 py-0.5">语言：{language}</span>
+                <span className="rounded bg-black/20 px-1.5 py-0.5">格式：{format}</span>
+                <span className="rounded bg-black/20 px-1.5 py-0.5">匹配度：{score}</span>
               </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                ['语言', languages],
-                ['格式', (candidate.Format || candidate.Ext || 'srt').toUpperCase()],
-                ['指纹分', fingerprintScore],
-                ['临时文件', candidate.TemporarySrtFileName || '未返回'],
-                ['外挂文件名', candidate.SidecarFileName || '未返回']
-              ].map(([label, value]) => (
-                <div key={label} className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
-                  <span className="text-xs text-shell-text/62">{label}</span>
-                  <strong className="break-all text-sm leading-6 text-shell-text">{value}</strong>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button type="button" variant="primary" onClick={() => void onDownload(candidate.Id)}>
-                {writeMode === 'sidecar' ? '下载并写为外挂字幕' : '下载并内封到当前分段'}
-              </Button>
-            </div>
-          </article>
+            <Button className="w-full sm:w-auto" type="button" variant="primary" onClick={() => void onDownload(candidate.Id)}>
+              {actionLabel}
+            </Button>
+          </div>
         );
       })}
     </div>
@@ -253,47 +225,20 @@ function BatchSummary({ items }: { items: OperationResultItem[] }): JSX.Element 
   }
 
   return (
-    <section className="grid gap-4">
-      <SectionHeading title="最近一次整组任务" description="这里保留最近一次整组转换或一键最佳匹配任务的结果，方便快速核对每个分段的处理状态。" />
-      <div className="grid gap-3">
+    <section className="flex flex-col gap-3">
+      <SectionHeading title="最近处理结果" />
+      <div className="flex flex-col gap-2">
         {items.map(item => (
-          <article
+          <div
             key={`${item.PartId ?? 'unknown'}-${item.Status ?? 'unknown'}`}
-            className={cx(
-              'grid gap-4 rounded-shell-lg border p-5',
-              getBatchTone(item.Status) === 'success' && 'border-shell-success/35 bg-[linear-gradient(145deg,rgba(109,177,140,0.18),rgba(243,241,236,0.03))]',
-              getBatchTone(item.Status) === 'warning' && 'border-shell-warning/35 bg-[linear-gradient(145deg,rgba(216,170,100,0.18),rgba(243,241,236,0.03))]',
-              getBatchTone(item.Status) === 'danger' && 'border-shell-danger/35 bg-[linear-gradient(145deg,rgba(212,122,114,0.18),rgba(243,241,236,0.03))]',
-              getBatchTone(item.Status) === 'neutral' && 'border-white/8 bg-white/4'
-            )}
+            className="flex flex-col gap-3 rounded-lg border border-white/5 bg-white/5 p-3 sm:flex-row sm:items-center sm:justify-between"
           >
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="grid gap-2">
-                <strong className="text-base font-semibold text-shell-text">{item.Label || '未命名分段'}</strong>
-                <span className="text-sm leading-7 text-shell-text-soft">{item.Message || '未返回处理信息。'}</span>
-              </div>
-              <Badge tone={getBatchTone(item.Status)}>{getBatchStatusText(item.Status)}</Badge>
+            <div className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-gray-200">{item.Label || '当前文件'}</span>
+              <span className="mt-1 block text-xs text-gray-500">{getBatchSummaryMessage(item)}</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {item.Container ? <Badge>{item.Container.toUpperCase()}</Badge> : null}
-              {item.Pipeline ? <Badge tone="accent">{item.Pipeline}</Badge> : null}
-              {item.WriteMode ? <Badge tone="accent">{getSubtitleWriteModeLabel(item.WriteMode)}</Badge> : null}
-              {item.RiskVerdict ? <Badge tone={item.NeedsCompatibilityRepair ? 'danger' : 'warning'}>{item.NeedsCompatibilityRepair ? `${item.RiskVerdict}（需修复）` : item.RiskVerdict}</Badge> : null}
-            </div>
-            {item.EmbeddedSubtitle ? (
-              <div className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
-                <span className="text-xs text-shell-text/62">内封结果</span>
-                <strong className="break-all text-sm leading-6 text-shell-text">{item.EmbeddedSubtitle.Title || `字幕流 #${item.EmbeddedSubtitle.StreamIndex}`}</strong>
-              </div>
-            ) : null}
-            {item.ExternalSubtitle ? (
-              <div className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
-                <span className="text-xs text-shell-text/62">外挂结果</span>
-                <strong className="break-all text-sm leading-6 text-shell-text">{item.ExternalSubtitle.FileName || item.ExternalSubtitle.FilePath || '未返回外挂文件'}</strong>
-              </div>
-            ) : null}
-            {item.MediaPath ? <div className="break-all text-xs leading-6 text-shell-text-faint">{item.MediaPath}</div> : null}
-          </article>
+            <Badge tone={getBatchTone(item.Status)}>{getBatchStatusText(item.Status)}</Badge>
+          </div>
         ))}
       </div>
     </section>
@@ -310,31 +255,27 @@ function PartNavigation({
   parts: MediaPart[];
 }): JSX.Element {
   if (parts.length === 0) {
-    return <EmptyState title="未识别到可管理分段。" description="当前媒体详情页没有返回可供插件管理的本地分段信息。" />;
+    return <div className="text-sm text-gray-500">没有可用文件。</div>;
   }
 
   return (
-    <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 xl:grid xl:gap-3 xl:overflow-x-visible xl:pb-0">
+    <div className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-x-visible lg:pb-0">
       {parts.map(part => (
         <button
           key={part.Id}
           className={cx(
-            'grid min-w-[14rem] shrink-0 snap-start gap-3 rounded-shell-md border border-white/8 bg-white/4 p-4 text-left transition hover:-translate-y-0.5 sm:min-w-[15rem] xl:min-w-0 xl:w-full',
-            activePartId === part.Id && 'border-shell-accent/35 bg-[linear-gradient(145deg,rgba(208,108,77,0.16),rgba(80,119,154,0.14))]'
+            'flex min-w-[12rem] shrink-0 flex-col gap-2 rounded-lg border p-3 text-left transition-colors lg:min-w-0',
+            activePartId === part.Id ? 'border-blue-500/30 bg-blue-500/10' : 'border-white/5 bg-white/5 hover:border-white/10'
           )}
           type="button"
           onClick={() => onSelect(part.Id)}
         >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="grid gap-1">
-              <strong className="text-sm font-semibold text-shell-text">{part.Label}</strong>
-              <span className="break-all text-xs leading-6 text-shell-text-faint">{part.FileName || getFileNameFromPath(part.MediaPath)}</span>
-            </div>
-            <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-full bg-white/8 px-2 text-xs font-bold text-shell-text/82">#{part.Index}</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Badge>{(part.Container || 'unknown').toUpperCase()}</Badge>
+          <div className="flex items-start justify-between gap-2">
+            <span className="line-clamp-2 text-sm font-medium text-gray-200">{part.Label || `文件 ${part.Index}`}</span>
             <Badge tone={getManagedStatusTone(part)}>{getManagedStatusText(part)}</Badge>
+          </div>
+          <span className="truncate text-xs text-gray-500">{getFileNameFromPath(part.MediaPath)}</span>
+          <div className="flex flex-wrap gap-2">
             <Badge tone={getCompatibilityTone(part)}>{getCompatibilityStatusText(part)}</Badge>
           </div>
         </button>
@@ -352,14 +293,20 @@ export function OverlayApp({
 }): JSX.Element {
   const activePart = state.itemData?.Parts.find(part => part.Id === state.activePartId) ?? null;
   const activeCandidates = activePart ? (state.searchResults.get(activePart.Id) ?? []) : [];
-  const writeModeLabel = getSubtitleWriteModeLabel(state.subtitleWriteMode);
-  const headerSummary = getPartSelectionSummary(activePart, activeCandidates.length, state.subtitleWriteMode);
+  const isMultipart = state.itemData?.IsMultipart === true;
+  const metrics = state.itemData ? getItemMetrics(state.itemData) : [];
+  const fallbackStatus = getDefaultOverlayStatus(activePart);
+  const bannerTitle = state.statusTitle || fallbackStatus.title;
+  const bannerMessage = state.statusMessage || fallbackStatus.message;
+  const bannerTone = state.statusTitle || state.statusMessage ? state.statusTone : fallbackStatus.tone;
+  const typeLabel = state.itemData?.ItemType || '媒体';
+  const structureLabel = isMultipart ? '多文件' : '单文件';
 
   return (
     <div
       className={cx(
-        'fixed inset-0 z-[100000] overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(208,108,77,0.18),transparent_30%),radial-gradient(circle_at_top_left,rgba(80,119,154,0.18),transparent_28%),rgba(7,10,15,0.82)] px-3 py-3 backdrop-blur-md sm:px-4 sm:py-4 lg:px-6 lg:py-6',
-        state.isOverlayOpen ? 'block' : 'hidden'
+        'fixed inset-0 z-[100000] flex items-stretch justify-center bg-black/60 p-2 backdrop-blur-sm transition-opacity sm:items-center sm:p-4 lg:p-6',
+        state.isOverlayOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
       )}
       onClick={event => {
         if (event.target === event.currentTarget) {
@@ -367,114 +314,102 @@ export function OverlayApp({
         }
       }}
     >
-      <div className="mx-auto grid min-h-[calc(100dvh-1.5rem)] w-full max-w-[1280px] grid-cols-1 rounded-none border border-shell-border bg-[linear-gradient(180deg,rgba(18,23,32,0.98),rgba(15,20,27,0.98))] shadow-shell-strong sm:min-h-[calc(100dvh-2rem)] sm:rounded-shell-xl lg:min-h-[calc(100dvh-3rem)] xl:h-[min(56rem,calc(100dvh-3rem))] xl:grid-rows-[auto_auto_auto_minmax(0,1fr)] xl:overflow-hidden">
-        <header className="relative grid gap-5 border-b border-shell-border px-[calc(var(--st-safe-left)+1rem)] py-4 pr-[calc(var(--st-safe-right)+1rem)] pt-[calc(var(--st-safe-top)+1rem)] sm:px-5 sm:py-5 lg:px-8 lg:py-7 xl:grid-cols-[minmax(0,1.2fr)_minmax(16rem,0.8fr)]">
-          <div className="absolute right-[-7rem] top-[-8rem] h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(208,108,77,0.24),transparent_72%)]" />
-          <div className="absolute bottom-[-10rem] left-[-7rem] h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(80,119,154,0.2),transparent_74%)]" />
-          <div className="relative grid min-w-0 gap-4 pr-12 sm:pr-14">
-            <div className="inline-flex items-center gap-2 text-[0.72rem] font-bold uppercase tracking-[0.18em] text-shell-text/68">Subtitles Tools 控制台</div>
-            <h2 className="font-serif text-[clamp(1.7rem,2.6vw,2.9rem)] leading-[1.06] text-shell-text sm:text-[clamp(2rem,2.6vw,2.9rem)]">{state.itemData?.Name || '未命名媒体'}</h2>
-            <p className="max-w-[42rem] text-sm leading-7 text-shell-text-soft sm:leading-8">
-              {state.itemData?.ItemType || '媒体项目'} · {state.itemData?.IsMultipart ? '多分段媒体' : '单文件媒体'}。当前弹层用于分段纳管、字幕搜索、内封 / 外挂写入与整组任务复核。
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Badge tone="accent">{state.itemData?.IsMultipart ? '多分段媒体' : '单文件媒体'}</Badge>
-              {headerSummary.map(item => <Badge key={item}>{item}</Badge>)}
+      <div className="flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121212] shadow-2xl sm:h-[min(100dvh-2rem,56rem)] sm:max-h-[min(100dvh-2rem,56rem)]">
+        <header className="flex flex-shrink-0 items-start justify-between gap-3 border-b border-white/5 p-4 sm:p-5">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-semibold text-gray-100">{state.itemData?.Name || '字幕处理'}</h2>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+              <span>{typeLabel}</span>
+              <span>·</span>
+              <span>{structureLabel}</span>
             </div>
           </div>
-          <div className="relative grid content-start justify-items-start gap-3 xl:justify-items-end">
-            <button
-              aria-label="关闭字幕控制台"
-              className="absolute right-0 top-0 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/5 text-2xl text-shell-text transition hover:rotate-90 hover:bg-white/9 disabled:cursor-not-allowed disabled:opacity-60 xl:static"
-              disabled={state.busy}
-              type="button"
-              onClick={actions.closeOverlay}
-            >
-              ×
-            </button>
-            <div className="hidden w-full rounded-shell-md border border-white/8 bg-white/4 p-4 text-sm leading-7 text-shell-text-soft lg:block xl:max-w-[20rem]">
-              当前写入模式是“{writeModeLabel}”。若当前分段仍被标记为高风险，建议优先执行 MKV 转换；若只是追求速度，外挂模式更适合 NAS。
-            </div>
-          </div>
+          <button
+            aria-label="关闭"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+            type="button"
+            onClick={actions.closeOverlay}
+          >
+            ×
+          </button>
         </header>
 
-        <section className="flex gap-3 overflow-x-auto border-b border-shell-border px-[calc(var(--st-safe-left)+1rem)] py-4 pr-[calc(var(--st-safe-right)+1rem)] sm:px-5 sm:py-5 lg:px-8 xl:grid xl:grid-cols-5 xl:overflow-visible">
-          {(state.itemData ? getItemMetrics(state.itemData) : []).map(metric => (
-            <div key={metric.label} className="min-w-[10.75rem] shrink-0 xl:min-w-0">
-              <MetricCard metric={metric} />
-            </div>
-          ))}
-        </section>
+        {isMultipart ? (
+          <div className="grid flex-shrink-0 grid-cols-2 gap-3 border-b border-white/5 p-4 sm:grid-cols-4 sm:p-5">
+            {metrics.map(metric => (
+              <MetricCard key={metric.label} metric={metric} />
+            ))}
+          </div>
+        ) : null}
 
-        <section className="grid gap-4 border-b border-shell-border px-[calc(var(--st-safe-left)+1rem)] py-4 pr-[calc(var(--st-safe-right)+1rem)] sm:px-5 sm:py-5 lg:px-8">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(19rem,24rem)]">
-            <StatusBanner
-              label={getStatusLabel(state.statusTone)}
-              message={state.statusMessage || `选择左侧分段后，即可开始搜索、转换，并按当前模式写入${writeModeLabel}。`}
-              title={getStatusTitle(state.statusTone)}
-              tone={state.statusTone}
-            />
-            <div className="grid gap-3 rounded-shell-md border border-white/8 bg-white/4 p-4">
-              <div className="grid gap-1.5">
-                <span className="text-[0.7rem] font-bold uppercase tracking-[0.16em] text-shell-text/65">字幕写入模式</span>
-                <strong className="text-base text-shell-text">当前将写入{writeModeLabel}</strong>
-                <p className="text-sm leading-6 text-shell-text-soft">内封适合归档，外挂适合 NAS 快速落地。切换只影响当前控制台，不会修改后端接口。</p>
+        <div className="flex flex-shrink-0 flex-col gap-4 border-b border-white/5 p-4 sm:p-5">
+          <StatusBanner label={bannerTone === 'idle' ? '提醒' : bannerTone === 'busy' ? '进行中' : bannerTone === 'success' ? '成功' : '失败'} message={bannerMessage} title={bannerTitle} tone={bannerTone} />
+
+          <section className="flex flex-col gap-3">
+            <SectionHeading title="当前文件操作" />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              <Button className="w-full" disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.refresh()}>
+                刷新状态
+              </Button>
+              <Button className="w-full" disabled={state.busy || !activePart} type="button" variant="primary" onClick={() => void actions.searchCurrentPart()}>
+                搜索当前文件
+              </Button>
+              <Button className="w-full" disabled={state.busy || !activePart} type="button" variant="secondary" onClick={() => void actions.convertCurrentPart()}>
+                优化当前文件
+              </Button>
+              <div className="xl:col-span-1">
+                <WriteModeSwitch disabled={state.busy} mode={state.subtitleWriteMode} onChange={actions.setSubtitleWriteMode} />
               </div>
-              <WriteModeSwitch disabled={state.busy} mode={state.subtitleWriteMode} onChange={actions.setSubtitleWriteMode} />
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-            <Button className="col-span-1" disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.refresh()}>
-              刷新分段状态
-            </Button>
-            <Button className="col-span-1" disabled={state.busy || !activePart} type="button" variant="tertiary" onClick={() => void actions.searchCurrentPart()}>
-              搜索当前分段
-            </Button>
-            <Button className="col-span-2 md:col-span-1" disabled={state.busy || !activePart} type="button" variant="secondary" onClick={() => void actions.convertCurrentPart()}>
-              转换当前分段为 MKV
-            </Button>
-            <Button className="col-span-1" disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.convertGroup()}>
-              一键整组转换为 MKV
-            </Button>
-            <Button className="col-span-2 md:col-span-2 xl:col-span-1" disabled={state.busy} type="button" variant="primary" onClick={() => void actions.downloadBest()}>
-              一键整组最佳匹配（{writeModeLabel}）
-            </Button>
-          </div>
-        </section>
+          </section>
 
-        <div className="grid gap-4 px-[calc(var(--st-safe-left)+1rem)] py-4 pr-[calc(var(--st-safe-right)+1rem)] pb-[calc(var(--st-safe-bottom)+1rem)] sm:px-5 sm:py-5 sm:pb-[calc(var(--st-safe-bottom)+1.25rem)] lg:px-8 lg:py-6 xl:min-h-0 xl:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)] xl:gap-0 xl:p-0">
-          <aside className="grid gap-4 rounded-shell-lg border border-shell-border bg-white/2 p-4 sm:p-5 xl:min-h-0 xl:grid-rows-[auto_minmax(0,1fr)] xl:gap-0 xl:rounded-none xl:border-0 xl:border-r xl:bg-white/2 xl:p-0">
-            <div className="grid gap-2 xl:border-b xl:border-white/6 xl:px-6 xl:py-5">
-              <h3 className="font-serif text-[1.55rem] leading-tight text-shell-text">分段导航</h3>
-              <p className="text-sm leading-7 text-shell-text-soft">左侧显示分段容器、纳管状态与兼容性状态。先选择分段，再执行搜索、转换或字幕写入。</p>
-            </div>
-            <div className="xl:grid xl:content-start xl:gap-3 xl:overflow-y-auto xl:px-6 xl:py-4">
+          {isMultipart ? (
+            <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <SectionHeading title="整组操作" description="一次处理当前媒体的全部文件，耗时会更长。" />
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button className="w-full" disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.convertGroup()}>
+                  整组优化
+                </Button>
+                <Button className="w-full" disabled={state.busy} type="button" variant="primary" onClick={() => void actions.downloadBest()}>
+                  整组自动选字幕
+                </Button>
+              </div>
+            </section>
+          ) : null}
+        </div>
+
+        {isMultipart ? (
+          <div className="border-b border-white/5 p-4 lg:hidden">
+            <PartNavigation activePartId={state.activePartId} onSelect={actions.selectPart} parts={state.itemData?.Parts ?? []} />
+          </div>
+        ) : null}
+
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          {isMultipart ? (
+            <aside className="hidden overflow-y-auto border-r border-white/5 bg-[#181818] p-4 lg:block lg:w-[18rem] lg:shrink-0">
               <PartNavigation activePartId={state.activePartId} onSelect={actions.selectPart} parts={state.itemData?.Parts ?? []} />
+            </aside>
+          ) : null}
+
+          <main className="flex-1 overflow-y-auto p-4 sm:p-5">
+            <div className="mx-auto flex max-w-4xl flex-col gap-6 sm:gap-8">
+              <section className="flex flex-col gap-3">
+                <SectionHeading title="当前文件" />
+                <CurrentPartCard part={activePart} writeMode={state.subtitleWriteMode} />
+              </section>
+
+              <section className="flex flex-col gap-3">
+                <SectionHeading title="找到的字幕" />
+                <CandidateList candidates={activeCandidates} onDownload={actions.downloadCandidate} writeMode={state.subtitleWriteMode} />
+              </section>
+
+              <section className="flex flex-col gap-3">
+                <SectionHeading title="已有字幕" />
+                <SubtitleList embedded={activePart?.EmbeddedSubtitles} external={activePart?.ExternalSubtitles} onDelete={actions.deleteEmbeddedSubtitle} />
+              </section>
+
+              <BatchSummary items={state.lastBatchItems} />
             </div>
-          </aside>
-
-          <main className="grid content-start gap-5 rounded-shell-lg border border-shell-border bg-white/[0.02] p-4 sm:p-5 xl:min-h-0 xl:overflow-y-auto xl:rounded-none xl:border-0 xl:bg-transparent xl:px-8 xl:py-6">
-            <section className="grid gap-4">
-              <SectionHeading title="当前分段概览" description="这里聚焦当前分段的纳管状态、兼容性判断、路径与流水线信息，用来决定下一步操作。" />
-              <CurrentPartCard part={activePart} writeMode={state.subtitleWriteMode} />
-            </section>
-
-            <section className="grid gap-4">
-              <SectionHeading title="当前已内封字幕流" description="区分插件写入轨道与原有轨道。只有插件写入的字幕流会显示删除按钮。" />
-              <EmbeddedSubtitleList onDelete={actions.deleteEmbeddedSubtitle} part={activePart} />
-            </section>
-
-            <section className="grid gap-4">
-              <SectionHeading title="当前外挂字幕" description="这里列出当前媒体目录中已经被插件识别到的外挂字幕文件，用来确认外挂模式的实际落盘结果。" />
-              <ExternalSubtitleList part={activePart} />
-            </section>
-
-            <section className="grid gap-4">
-              <SectionHeading title="搜索结果" description={`候选字幕按匹配质量展示。下载时会先转换为 UTF-8 SRT，再按当前模式写入${writeModeLabel}。`} />
-              <CandidateList candidates={activeCandidates} onDownload={actions.downloadCandidate} writeMode={state.subtitleWriteMode} />
-            </section>
-
-            <BatchSummary items={state.lastBatchItems} />
           </main>
         </div>
       </div>
@@ -492,17 +427,16 @@ export function FloatingButton({
   return (
     <div
       className={cx(
-        'fixed z-[99999] translate-y-3 opacity-0 transition [bottom:calc(var(--st-safe-bottom)+1rem)] [right:calc(var(--st-safe-right)+1rem)] sm:[bottom:calc(var(--st-safe-bottom)+1.25rem)] sm:[right:calc(var(--st-safe-right)+1.25rem)] lg:[bottom:calc(var(--st-safe-bottom)+2rem)] lg:[right:calc(var(--st-safe-right)+2rem)]',
-        visible && 'translate-y-0 opacity-100'
+        'fixed z-[99999] transition-all duration-300 [bottom:calc(var(--st-safe-bottom)+1rem)] [right:calc(var(--st-safe-right)+1rem)] sm:[bottom:calc(var(--st-safe-bottom)+1.25rem)] sm:[right:calc(var(--st-safe-right)+1.25rem)]',
+        visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
       )}
     >
       <button
-        className="grid min-w-[8.5rem] gap-0.5 rounded-[1.15rem] border border-white/8 bg-[linear-gradient(140deg,rgba(208,108,77,0.94),rgba(142,63,47,0.98))] px-4 py-3 text-left text-[rgb(255,248,244)] shadow-[0_18px_38px_rgba(10,13,20,0.38)] transition hover:-translate-y-0.5 sm:min-w-[9.75rem] sm:gap-1 sm:rounded-[1.25rem] sm:px-5 sm:py-4"
+        className="flex min-h-11 items-center gap-2 rounded-full bg-blue-600 px-5 py-3 text-white shadow-lg transition-transform hover:scale-105 hover:bg-blue-500"
         type="button"
         onClick={onOpen}
       >
-        <span className="text-sm font-bold tracking-[0.04em]">字幕控制台</span>
-        <span className="hidden text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[rgba(255,248,244,0.74)] sm:block">搜索 · 内封 / 外挂</span>
+        <span className="text-sm font-medium">字幕处理</span>
       </button>
     </div>
   );

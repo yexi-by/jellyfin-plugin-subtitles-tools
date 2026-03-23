@@ -1,6 +1,5 @@
 import { API_ROOT, REFRESH_RETRY_ATTEMPTS, REFRESH_RETRY_DELAY_MS } from '../shared/constants';
 import { getCurrentItemId, sleep } from '../shared/dom';
-import { extractErrorMessage } from '../shared/errors';
 import { requestJson } from '../shared/runtime';
 import type {
   ItemPartsPayload,
@@ -31,6 +30,7 @@ const initialState: OverlayStoreState = {
   lastBatchItems: [],
   lastLocation: '',
   searchResults: new Map<string, SubtitleCandidate[]>(),
+  statusTitle: '',
   statusMessage: '',
   statusTone: 'idle'
 };
@@ -75,8 +75,9 @@ export function setBusy(busy: boolean): void {
   patchOverlayState({ busy });
 }
 
-export function setStatus(message: string, tone: OverlayStoreState['statusTone']): void {
+export function setStatus(title: string, message: string, tone: OverlayStoreState['statusTone']): void {
   patchOverlayState({
+    statusTitle: title,
     statusMessage: message,
     statusTone: tone
   });
@@ -104,6 +105,7 @@ export function applyPartsPayload(itemId: string, payload: ItemPartsPayload): vo
     itemId,
     lastBatchItems: isSameItem ? state.lastBatchItems : [],
     searchResults: isSameItem ? state.searchResults : new Map<string, SubtitleCandidate[]>(),
+    statusTitle: isSameItem ? state.statusTitle : '',
     statusMessage: isSameItem ? state.statusMessage : '',
     statusTone: isSameItem ? state.statusTone : 'idle'
   };
@@ -140,7 +142,7 @@ export async function refreshCurrentPageState(forceReload: boolean): Promise<voi
   try {
     await fetchParts(itemId, forceReload);
     patchOverlayState({ isFabVisible: true });
-  } catch (error) {
+  } catch {
     replaceOverlayState({
       ...initialState,
       isFabVisible: true,
@@ -148,7 +150,8 @@ export async function refreshCurrentPageState(forceReload: boolean): Promise<voi
       itemId,
       lastLocation: locationSignature,
       subtitleWriteMode: state.subtitleWriteMode,
-      statusMessage: extractErrorMessage(error),
+      statusTitle: '读取媒体失败',
+      statusMessage: '请刷新页面后重试。',
       statusTone: 'error'
     });
   }

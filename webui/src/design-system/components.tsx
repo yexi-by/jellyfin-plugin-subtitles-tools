@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes, HTMLAttributes, JSX, ReactNode } from 'react
 import type { BatchMetric, ConnectionMetric, SubtitleWriteMode, UiTone } from '../shared/types';
 
 type ButtonVariant = 'danger' | 'primary' | 'secondary' | 'tertiary';
+type ButtonSize = 'md' | 'sm';
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
@@ -10,21 +11,27 @@ function cx(...classNames: Array<string | false | null | undefined>): string {
 export function Button({
   children,
   className,
+  size = 'md',
   variant = 'secondary',
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }): JSX.Element {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { size?: ButtonSize; variant?: ButtonVariant }): JSX.Element {
   const variants: Record<ButtonVariant, string> = {
-    danger: 'bg-[linear-gradient(135deg,rgba(212,122,114,0.92),rgba(138,58,54,0.96))] text-shell-text shadow-[0_12px_24px_rgba(138,58,54,0.22)]',
-    primary: 'bg-[linear-gradient(135deg,var(--color-shell-accent),var(--color-shell-accent-strong))] text-shell-text shadow-[0_14px_28px_rgba(142,63,47,0.3)]',
-    secondary: 'border border-shell-border bg-white/5 text-shell-text',
-    tertiary: 'border border-shell-cool/20 bg-[linear-gradient(135deg,rgba(80,119,154,0.22),rgba(51,72,95,0.28))] text-shell-text'
+    danger: 'border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20',
+    primary: 'border border-transparent bg-blue-600 text-white hover:bg-blue-500',
+    secondary: 'border border-white/10 bg-white/5 text-gray-200 hover:bg-white/10',
+    tertiary: 'border border-transparent bg-transparent text-gray-400 hover:bg-white/5 hover:text-gray-200'
+  };
+  const sizes: Record<ButtonSize, string> = {
+    md: 'min-h-11 px-4 py-2 text-sm',
+    sm: 'min-h-11 px-3 py-2 text-sm'
   };
 
   return (
     <button
       {...props}
       className={cx(
-        'inline-flex min-h-11 min-w-0 items-center justify-center rounded-[1rem] border border-transparent px-4 py-2.5 text-center text-sm font-semibold leading-6 transition disabled:cursor-not-allowed disabled:opacity-60 hover:-translate-y-0.5 disabled:hover:translate-y-0 sm:min-h-12 sm:rounded-full sm:px-5 sm:py-3',
+        'inline-flex min-w-0 items-center justify-center rounded-lg font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        sizes[size],
         variants[variant],
         className
       )}
@@ -42,15 +49,15 @@ export function Badge({
   tone?: Extract<UiTone, 'accent' | 'danger' | 'neutral' | 'success' | 'warning'>;
 }): JSX.Element {
   const tones: Record<typeof tone, string> = {
-    accent: 'border-shell-accent/35 bg-shell-accent/15 text-[rgb(255,216,204)]',
-    danger: 'border-shell-danger/30 bg-shell-danger/18 text-[rgb(255,215,209)]',
-    neutral: 'border-shell-border bg-white/5 text-shell-text/85',
-    success: 'border-shell-success/30 bg-shell-success/15 text-[rgb(213,244,225)]',
-    warning: 'border-shell-warning/30 bg-shell-warning/15 text-[rgb(255,227,188)]'
+    accent: 'border-blue-500/20 bg-blue-500/10 text-blue-400',
+    danger: 'border-red-500/20 bg-red-500/10 text-red-400',
+    neutral: 'border-white/10 bg-white/5 text-gray-300',
+    success: 'border-green-500/20 bg-green-500/10 text-green-400',
+    warning: 'border-yellow-500/20 bg-yellow-500/10 text-yellow-400'
   };
 
   return (
-    <span className={cx('inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold', tones[tone])}>
+    <span className={cx('inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium', tones[tone])}>
       {children}
     </span>
   );
@@ -61,7 +68,7 @@ export function Panel({
   className
 }: HTMLAttributes<HTMLElement>): JSX.Element {
   return (
-    <section className={cx('grid gap-5 rounded-shell-lg border border-shell-border bg-shell-panel p-6 shadow-shell-soft', className)}>
+    <section className={cx('flex flex-col gap-4 rounded-xl border border-white/10 bg-[#1e1e1e] p-5 shadow-sm', className)}>
       {children}
     </section>
   );
@@ -69,18 +76,15 @@ export function Panel({
 
 export function SectionHeading({
   description,
-  eyebrow,
   title
 }: {
   description?: ReactNode;
-  eyebrow?: ReactNode;
   title: ReactNode;
 }): JSX.Element {
   return (
-    <div className="grid gap-1.5 sm:gap-2">
-      {eyebrow ? <div className="text-[0.7rem] font-bold uppercase tracking-[0.18em] text-shell-text/65">{eyebrow}</div> : null}
-      <h2 className="font-serif text-[clamp(1.25rem,2vw,1.8rem)] leading-tight sm:text-[clamp(1.4rem,2vw,1.8rem)]">{title}</h2>
-      {description ? <p className="max-w-[44rem] text-sm leading-6 text-shell-text-soft sm:leading-7">{description}</p> : null}
+    <div className="flex flex-col gap-1">
+      <h2 className="text-lg font-medium text-gray-100">{title}</h2>
+      {description ? <p className="text-sm text-gray-400">{description}</p> : null}
     </div>
   );
 }
@@ -91,14 +95,14 @@ export function FieldShell({
   label
 }: {
   children: ReactNode;
-  description: ReactNode;
+  description?: ReactNode;
   label: string;
 }): JSX.Element {
   return (
-    <label className="grid gap-3 rounded-shell-md border border-white/8 bg-white/4 p-4">
-      <span className="text-sm font-semibold text-shell-text">{label}</span>
+    <label className="flex flex-col gap-2">
+      <span className="text-sm font-medium text-gray-200">{label}</span>
       {children}
-      <span className="text-[0.82rem] leading-6 text-shell-text-soft">{description}</span>
+      {description ? <span className="text-xs text-gray-500">{description}</span> : null}
     </label>
   );
 }
@@ -115,19 +119,19 @@ export function StatusBanner({
   tone: Extract<UiTone, 'busy' | 'error' | 'idle' | 'success'>;
 }): JSX.Element {
   const styles = {
-    busy: 'border-shell-cool/35 bg-[linear-gradient(145deg,rgba(80,119,154,0.16),rgba(243,241,236,0.03))]',
-    error: 'border-shell-danger/35 bg-[linear-gradient(145deg,rgba(212,122,114,0.18),rgba(243,241,236,0.03))]',
-    idle: 'border-white/8 bg-white/4',
-    success: 'border-shell-success/35 bg-[linear-gradient(145deg,rgba(109,177,140,0.18),rgba(243,241,236,0.03))]'
+    busy: 'border-blue-500/20 bg-blue-500/5 text-blue-200',
+    error: 'border-red-500/20 bg-red-500/5 text-red-200',
+    idle: 'border-white/10 bg-white/5 text-gray-300',
+    success: 'border-green-500/20 bg-green-500/5 text-green-200'
   };
 
   return (
-    <div className={cx('grid gap-3 rounded-shell-md border p-3.5 sm:p-4', styles[tone])}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="rounded-full bg-white/8 px-3 py-1.5 text-[0.7rem] font-bold uppercase tracking-[0.14em] text-shell-text/82">{label}</span>
-        <span className="text-sm font-semibold text-shell-text">{title}</span>
+    <div className={cx('flex flex-col gap-1.5 rounded-lg border p-4', styles[tone])}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="rounded bg-black/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wider opacity-80">{label}</span>
       </div>
-      <p className="text-sm leading-6 text-shell-text-soft sm:leading-7">{message}</p>
+      <p className="text-sm opacity-80">{message}</p>
     </div>
   );
 }
@@ -138,11 +142,11 @@ export function ConnectionMetrics({ metrics }: { metrics: ConnectionMetric[] }):
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {metrics.map(metric => (
-        <div key={metric.label} className="grid gap-1.5 rounded-shell-sm border border-white/8 bg-white/4 p-3.5">
-          <span className="text-xs text-shell-text/65">{metric.label}</span>
-          <strong className="break-all text-sm leading-6 text-shell-text">{metric.value}</strong>
+        <div key={metric.label} className="flex flex-col gap-1 rounded-lg border border-white/5 bg-white/5 p-3">
+          <span className="text-xs text-gray-400">{metric.label}</span>
+          <strong className="truncate text-sm font-medium text-gray-200">{metric.value}</strong>
         </div>
       ))}
     </div>
@@ -151,17 +155,17 @@ export function ConnectionMetrics({ metrics }: { metrics: ConnectionMetric[] }):
 
 export function MetricCard({ metric }: { metric: BatchMetric }): JSX.Element {
   const toneClasses: Record<BatchMetric['tone'], string> = {
-    danger: 'bg-[linear-gradient(145deg,rgba(212,122,114,0.16),rgba(243,241,236,0.03))]',
-    neutral: 'bg-white/4',
-    success: 'bg-[linear-gradient(145deg,rgba(109,177,140,0.14),rgba(243,241,236,0.03))]',
-    warning: 'bg-[linear-gradient(145deg,rgba(216,170,100,0.14),rgba(243,241,236,0.03))]'
+    danger: 'border-red-500/20 bg-red-500/5',
+    neutral: 'border-white/10 bg-white/5',
+    success: 'border-green-500/20 bg-green-500/5',
+    warning: 'border-yellow-500/20 bg-yellow-500/5'
   };
 
   return (
-    <div className={cx('grid min-h-[6rem] gap-1.5 rounded-shell-lg border border-white/8 p-3.5 sm:min-h-[6.5rem] sm:gap-2 sm:p-4 xl:min-h-[7rem]', toneClasses[metric.tone])}>
-      <span className="text-[0.7rem] font-bold uppercase tracking-[0.14em] text-shell-text/62">{metric.label}</span>
-      <strong className="text-[clamp(1.6rem,2.2vw,2.4rem)] leading-none text-shell-text sm:text-[clamp(1.8rem,2.2vw,2.4rem)]">{metric.value}</strong>
-      <span className="text-sm leading-5 text-shell-text-soft sm:leading-6">{metric.note}</span>
+    <div className={cx('flex h-full flex-col gap-1 rounded-xl border p-4', toneClasses[metric.tone])}>
+      <span className="text-xs text-gray-400">{metric.label}</span>
+      <strong className="text-2xl font-semibold text-gray-100">{metric.value}</strong>
+      {metric.note ? <span className="text-xs leading-5 text-gray-500">{metric.note}</span> : null}
     </div>
   );
 }
@@ -174,9 +178,9 @@ export function EmptyState({
   title: ReactNode;
 }): JSX.Element {
   return (
-    <div className="grid gap-3 rounded-shell-lg border border-white/8 bg-white/4 p-4 sm:p-5">
-      <strong className="text-base font-semibold text-shell-text">{title}</strong>
-      <span className="text-sm leading-6 text-shell-text-soft sm:leading-7">{description}</span>
+    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 p-8 text-center">
+      <strong className="text-sm font-medium text-gray-300">{title}</strong>
+      <span className="text-sm text-gray-500">{description}</span>
     </div>
   );
 }
@@ -190,44 +194,32 @@ export function WriteModeSwitch({
   mode: SubtitleWriteMode;
   onChange: (mode: SubtitleWriteMode) => void;
 }): JSX.Element {
-  const options: Array<{ description: string; label: string; value: SubtitleWriteMode }> = [
-    {
-      description: '写入 MKV，更适合归档。',
-      label: '内封字幕',
-      value: 'embedded'
-    },
-    {
-      description: '直接生成同名 SRT，更适合 NAS。',
-      label: '外挂字幕',
-      value: 'sidecar'
-    }
-  ];
-
   return (
-    <div className="grid gap-2 rounded-shell-md border border-white/8 bg-white/4 p-2 sm:p-2.5">
-      <div className="grid gap-2 sm:grid-cols-2">
-        {options.map(option => {
-          const active = mode === option.value;
-          return (
-            <button
-              key={option.value}
-              className={cx(
-                'grid gap-1 rounded-[0.9rem] border px-4 py-3 text-left transition sm:rounded-full',
-                active
-                  ? 'border-shell-accent/35 bg-[linear-gradient(135deg,rgba(208,108,77,0.18),rgba(80,119,154,0.16))] text-shell-text'
-                  : 'border-transparent bg-transparent text-shell-text-soft hover:border-white/8 hover:bg-white/4',
-                disabled && 'cursor-not-allowed opacity-60'
-              )}
-              disabled={disabled}
-              type="button"
-              onClick={() => onChange(option.value)}
-            >
-              <span className="text-sm font-semibold leading-6">{option.label}</span>
-              <span className="text-xs leading-5 text-shell-text-soft">{option.description}</span>
-            </button>
-          );
-        })}
-      </div>
+    <div className="flex w-full overflow-hidden rounded-lg border border-white/10 bg-black/20 p-1">
+      <button
+        className={cx(
+          'min-h-11 flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+          mode === 'embedded' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200',
+          disabled && 'cursor-not-allowed opacity-50'
+        )}
+        disabled={disabled}
+        type="button"
+        onClick={() => onChange('embedded')}
+      >
+        写入视频
+      </button>
+      <button
+        className={cx(
+          'min-h-11 flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+          mode === 'sidecar' ? 'bg-white/10 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200',
+          disabled && 'cursor-not-allowed opacity-50'
+        )}
+        disabled={disabled}
+        type="button"
+        onClick={() => onChange('sidecar')}
+      >
+        另存字幕
+      </button>
     </div>
   );
 }

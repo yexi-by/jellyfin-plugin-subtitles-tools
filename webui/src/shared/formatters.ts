@@ -24,12 +24,18 @@ function readValue(source: Record<string, unknown> | undefined, keys: string[], 
   return fallback;
 }
 
+function hasCompatibilityRisk(part: MediaPart): boolean {
+  return part.NeedsCompatibilityRepair === true
+    || part.RiskVerdict?.includes('高风险') === true
+    || part.RiskVerdict?.includes('中风险') === true;
+}
+
 export function buildIdleConnectionStatus(): ConnectionStatusViewModel {
   return {
     tone: 'idle',
-    label: '等待检测',
-    title: '保存前先确认整条链路可用',
-    message: '这里会显示 Python 服务版本、字幕源、FFmpeg / FFprobe 路径、QSV 设备与 h264_qsv 支持情况。',
+    label: '待检测',
+    title: '尚未检测',
+    message: '建议先测试连接，再保存设置。',
     details: []
   };
 }
@@ -37,9 +43,9 @@ export function buildIdleConnectionStatus(): ConnectionStatusViewModel {
 export function buildLoadingConnectionStatus(): ConnectionStatusViewModel {
   return {
     tone: 'busy',
-    label: '正在检测',
-    title: '正在验证服务端与转码环境',
-    message: '正在检查 Python 服务连通性、FFmpeg 可执行文件和 Intel QSV 能力，请稍候。',
+    label: '检测中',
+    title: '正在检测连接',
+    message: '正在检查服务地址和运行环境，请稍候。',
     details: []
   };
 }
@@ -48,40 +54,36 @@ export function buildSuccessConnectionStatus(payload: ConnectionHealthPayload): 
   const health = (payload.Health ?? {}) as Record<string, unknown>;
   const ffmpeg = (payload.Ffmpeg ?? {}) as Record<string, unknown>;
   const video = (payload.Video ?? {}) as Record<string, unknown>;
-  const supportsH264Qsv = video.supportsH264Qsv === true ? '支持' : '不支持';
+  const supportsH264Qsv = video.supportsH264Qsv === true ? '是' : '否';
 
   return {
     tone: 'success',
-    label: '检测通过',
-    title: '服务链路已经准备就绪',
-    message: '当前配置可以正常连接 Python 服务，并拿到字幕源与转码环境信息，可以直接保存。',
+    label: '正常',
+    title: '连接正常',
+    message: '可以开始使用字幕搜索和保存功能。',
     details: [
-      { label: '服务版本', value: readValue(health, ['Version', 'version'], '未返回') },
-      { label: '字幕源', value: readValue(health, ['ProviderName', 'providerName', 'provider_name'], '未返回') },
-      { label: 'FFmpeg', value: readValue(ffmpeg, ['ffmpegPath', 'FfmpegPath'], '未找到') },
-      { label: 'FFprobe', value: readValue(ffmpeg, ['ffprobePath', 'FfprobePath'], '未找到') },
-      { label: 'QSV 设备', value: readValue(video, ['qsvRenderDevicePath', 'QsvRenderDevicePath'], '未配置') },
-      { label: 'h264_qsv', value: supportsH264Qsv }
+      { label: '服务版本', value: readValue(health, ['Version', 'version'], '-') },
+      { label: '字幕源', value: readValue(health, ['ProviderName', 'providerName', 'provider_name'], '-') },
+      { label: 'FFmpeg', value: readValue(ffmpeg, ['ffmpegPath', 'FfmpegPath'], '-') },
+      { label: 'FFprobe', value: readValue(ffmpeg, ['ffprobePath', 'FfprobePath'], '-') },
+      { label: 'QSV 设备', value: readValue(video, ['qsvRenderDevicePath', 'QsvRenderDevicePath'], '-') },
+      { label: 'QSV 加速', value: supportsH264Qsv }
     ]
   };
 }
 
-export function buildErrorConnectionStatus(message: string): ConnectionStatusViewModel {
+export function buildErrorConnectionStatus(): ConnectionStatusViewModel {
   return {
     tone: 'error',
-    label: '检测失败',
-    title: '当前环境还不能直接投入使用',
-    message,
+    label: '失败',
+    title: '连接失败',
+    message: '无法连接服务，请检查地址、超时或服务是否启动。',
     details: []
   };
 }
 
 export function getManagedStatusText(part: MediaPart): string {
-  if (part.IsManaged !== true) {
-    return '未纳管';
-  }
-
-  return part.ReadIdentityFromMetadata ? '已纳管（读取 MKV 元数据）' : '已纳管';
+  return part.IsManaged === true ? '已识别' : '待处理';
 }
 
 export function getManagedStatusTone(part: MediaPart): Extract<UiTone, 'neutral' | 'success'> {
@@ -90,14 +92,14 @@ export function getManagedStatusTone(part: MediaPart): Extract<UiTone, 'neutral'
 
 export function getCompatibilityStatusText(part: MediaPart): string {
   if (!part.RiskVerdict) {
-    return '未评估';
+    return '等待检查';
   }
 
-  if (part.NeedsCompatibilityRepair === true) {
-    return `${part.RiskVerdict}（需修复）`;
+  if (hasCompatibilityRisk(part)) {
+    return '建议先优化';
   }
 
-  return part.RiskVerdict;
+  return '播放正常';
 }
 
 export function getCompatibilityTone(part: MediaPart): Extract<UiTone, 'neutral' | 'success' | 'warning' | 'danger'> {
@@ -105,11 +107,7 @@ export function getCompatibilityTone(part: MediaPart): Extract<UiTone, 'neutral'
     return 'neutral';
   }
 
-  if (part.NeedsCompatibilityRepair === true || part.RiskVerdict.includes('高风险')) {
-    return 'danger';
-  }
-
-  if (part.RiskVerdict.includes('中风险')) {
+  if (hasCompatibilityRisk(part)) {
     return 'warning';
   }
 
@@ -135,58 +133,78 @@ export function getBatchTone(status: string | undefined): Extract<UiTone, 'neutr
 export function getBatchStatusText(status: string | undefined): string {
   const labels: Record<string, string> = {
     completed: '已完成',
-    converted: '已转换',
+    converted: '已优化',
     deleted: '已删除',
-    embedded: '已内封',
+    embedded: '写入视频',
     failed: '失败',
-    no_candidates: '无候选',
+    no_candidates: '无结果',
     partial: '部分完成',
-    sidecar: '已写为外挂'
+    sidecar: '另存字幕'
   };
 
-  return status ? (labels[status] ?? status) : '未知状态';
+  return status ? (labels[status] ?? status) : '未知';
+}
+
+export function getBatchSummaryMessage(item: OperationResultItem): string {
+  if (item.Status === 'embedded') {
+    return '字幕已写入视频文件。';
+  }
+
+  if (item.Status === 'sidecar') {
+    return '字幕文件已保存到视频同目录。';
+  }
+
+  if (item.Status === 'converted') {
+    return '已完成播放兼容性优化。';
+  }
+
+  if (item.Status === 'deleted') {
+    return '已删除当前字幕。';
+  }
+
+  if (item.Status === 'no_candidates') {
+    return '没有找到可用字幕。';
+  }
+
+  if (item.Status === 'partial') {
+    return '部分文件处理完成，请检查结果。';
+  }
+
+  if (item.Status === 'failed') {
+    return '处理失败，请稍后重试。';
+  }
+
+  return item.Message?.trim() || '处理完成。';
 }
 
 export function getItemMetrics(itemData: ItemPartsPayload): BatchMetric[] {
   const parts = itemData.Parts ?? [];
-  const managedCount = parts.filter(part => part.IsManaged === true).length;
-  const repairCount = parts.filter(part => part.NeedsCompatibilityRepair === true).length;
-  const embeddedCount = parts.reduce((sum, part) => sum + (part.EmbeddedSubtitles?.length ?? 0), 0);
-  const externalCount = parts.reduce((sum, part) => sum + (part.ExternalSubtitles?.length ?? 0), 0);
-  const pluginManagedCount = parts.reduce((sum, part) => {
-    return sum + (part.EmbeddedSubtitles?.filter(track => track.IsPluginManaged === true).length ?? 0);
+  const pendingCount = parts.filter(part => part.IsManaged !== true).length;
+  const subtitleCount = parts.reduce((sum, part) => {
+    return sum + (part.EmbeddedSubtitles?.length ?? 0) + (part.ExternalSubtitles?.length ?? 0);
   }, 0);
+  const repairCount = parts.filter(part => hasCompatibilityRisk(part)).length;
 
   return [
     {
-      label: '分段总数',
+      label: '文件数',
       value: String(parts.length),
-      note: itemData.IsMultipart ? '当前媒体已识别为多分段' : '当前媒体为单文件结构',
       tone: 'neutral'
     },
     {
-      label: '已纳管分段',
-      value: String(managedCount),
-      note: managedCount === parts.length && parts.length > 0 ? '全部分段都已纳入插件识别范围' : '仍有分段等待纳管',
-      tone: managedCount === parts.length && parts.length > 0 ? 'success' : 'warning'
+      label: '待处理',
+      value: String(pendingCount),
+      tone: pendingCount === 0 ? 'success' : 'warning'
     },
     {
-      label: '待兼容修复',
+      label: '已有字幕',
+      value: String(subtitleCount),
+      tone: subtitleCount > 0 ? 'success' : 'neutral'
+    },
+    {
+      label: '建议优化',
       value: String(repairCount),
-      note: repairCount === 0 ? '当前没有高风险硬解片段' : '建议优先执行 MKV 转换修复',
-      tone: repairCount === 0 ? 'success' : 'danger'
-    },
-    {
-      label: '内封字幕总数',
-      value: String(embeddedCount),
-      note: pluginManagedCount > 0 ? `插件写入 ${pluginManagedCount} 条字幕轨` : '暂未检测到插件写入轨道',
-      tone: embeddedCount > 0 ? 'success' : 'neutral'
-    },
-    {
-      label: '外挂字幕总数',
-      value: String(externalCount),
-      note: externalCount > 0 ? '当前媒体目录中已检测到可被 Jellyfin 识别的外挂字幕' : '当前媒体目录中还没有匹配到外挂字幕文件',
-      tone: externalCount > 0 ? 'success' : 'neutral'
+      tone: repairCount === 0 ? 'success' : 'warning'
     }
   ];
 }
@@ -194,9 +212,9 @@ export function getItemMetrics(itemData: ItemPartsPayload): BatchMetric[] {
 export function getStatusTitle(tone: Extract<UiTone, 'idle' | 'busy' | 'success' | 'error'>): string {
   const labels = {
     busy: '正在处理',
-    error: '需要处理',
-    idle: '准备就绪',
-    success: '最近一次操作已完成'
+    error: '操作失败',
+    idle: '下一步',
+    success: '处理完成'
   };
 
   return labels[tone];
@@ -204,40 +222,51 @@ export function getStatusTitle(tone: Extract<UiTone, 'idle' | 'busy' | 'success'
 
 export function getStatusLabel(tone: Extract<UiTone, 'idle' | 'busy' | 'success' | 'error'>): string {
   const labels = {
-    busy: '处理中',
-    error: '异常',
-    idle: '待执行',
-    success: '已完成'
+    busy: '进行中',
+    error: '失败',
+    idle: '提醒',
+    success: '成功'
   };
 
   return labels[tone];
 }
 
-export function getPartSelectionSummary(part: MediaPart | null, activeSearchCount: number, mode?: SubtitleWriteMode): string[] {
+export function getDefaultOverlayStatus(part: MediaPart | null): {
+  message: string;
+  title: string;
+  tone: Extract<UiTone, 'idle'>;
+} {
   if (!part) {
-    return [];
+    return {
+      tone: 'idle',
+      title: '还没有选择文件',
+      message: '先选择一个文件，再开始处理。'
+    };
   }
 
-  const summary = [
-    `当前选中：${part.Label}`,
-    `候选字幕 ${activeSearchCount} 条`
-  ];
-
-  if (mode) {
-    summary.push(`写入模式：${getSubtitleWriteModeLabel(mode)}`);
+  if (part.IsManaged !== true) {
+    return {
+      tone: 'idle',
+      title: '当前文件还不能直接保存字幕',
+      message: '建议先刷新状态或先优化当前文件。'
+    };
   }
 
-  return summary;
-}
-
-export function summarizeResultMessage(result: OperationResultItem | null | undefined): string {
-  if (!result) {
-    return '操作已完成。';
+  if (hasCompatibilityRisk(part)) {
+    return {
+      tone: 'idle',
+      title: '建议先优化当前文件',
+      message: '这样更稳，后续保存字幕也更顺畅。'
+    };
   }
 
-  return result.Message?.trim() || '操作已完成。';
+  return {
+    tone: 'idle',
+    title: '下一步',
+    message: '可以先搜索字幕，再选择保存方式。'
+  };
 }
 
 export function getSubtitleWriteModeLabel(mode: SubtitleWriteMode): string {
-  return mode === 'sidecar' ? '外挂字幕' : '内封字幕';
+  return mode === 'sidecar' ? '另存字幕' : '写入视频';
 }

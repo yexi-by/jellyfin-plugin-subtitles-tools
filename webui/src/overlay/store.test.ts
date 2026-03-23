@@ -23,6 +23,7 @@ describe('overlay store error recovery', () => {
     expect(store.getOverlayState()).toMatchObject({
       itemId: 'item-1',
       isFabVisible: true,
+      statusTitle: '读取媒体失败',
       statusTone: 'error'
     });
   });
@@ -62,7 +63,7 @@ describe('overlay store error recovery', () => {
         Format: 'srt',
         Language: 'zho'
       },
-      Message: '字幕已转为 UTF-8 SRT 并写成外挂字幕。',
+      Message: '字幕已保存到视频同目录。',
       Status: 'sidecar',
       WriteMode: 'sidecar'
     });

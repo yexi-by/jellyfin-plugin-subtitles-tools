@@ -132,7 +132,7 @@ export interface SearchOperationPayload extends OperationResultItem {
 
 export interface BatchMetric {
   label: string;
-  note: string;
+  note?: string;
   tone: Extract<UiTone, 'neutral' | 'success' | 'warning' | 'danger'>;
   value: string;
 }
@@ -146,6 +146,7 @@ export interface OverlayViewState {
   lastBatchItems: OperationResultItem[];
   lastLocation: string;
   searchResults: Map<string, SubtitleCandidate[]>;
+  statusTitle: string;
   statusMessage: string;
   statusTone: Extract<UiTone, 'idle' | 'busy' | 'success' | 'error'>;
 }

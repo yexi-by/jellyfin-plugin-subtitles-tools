@@ -2,8 +2,6 @@ import { createRoot } from 'react-dom/client';
 import '../design-system/theme.css';
 import { OVERLAY_IDS, PLUGIN_UNIQUE_ID, ROUTE_POLL_MS } from '../shared/constants';
 import { getCurrentItemId } from '../shared/dom';
-import { extractErrorMessage } from '../shared/errors';
-import { getSubtitleWriteModeLabel } from '../shared/formatters';
 import { readPluginConfiguration } from '../shared/runtime';
 import type { SubtitleWriteMode } from '../shared/types';
 import { FloatingButton, OverlayApp } from './App';
@@ -29,7 +27,6 @@ import {
   refreshOverlayDataWithRetry,
   searchPart,
   setBatchResults,
-  setBusy,
   setSearchResults,
   setStatus,
   setSubtitleWriteMode,
@@ -52,6 +49,22 @@ function normalizeWriteMode(value: string | undefined): SubtitleWriteMode {
   return value === 'sidecar' ? 'sidecar' : 'embedded';
 }
 
+function getWriteModeMessages(mode: SubtitleWriteMode): { busyMessage: string; successMessage: string; successTitle: string } {
+  if (mode === 'sidecar') {
+    return {
+      busyMessage: '字幕会保存到视频同目录。',
+      successMessage: '字幕文件已写到视频同目录。',
+      successTitle: '字幕已保存'
+    };
+  }
+
+  return {
+    busyMessage: '字幕会保存到视频文件中。',
+    successMessage: '可以直接在播放器里使用。',
+    successTitle: '字幕已写入视频'
+  };
+}
+
 if (!window.__subtitlesToolsGlobalLoaded) {
   window.__subtitlesToolsGlobalLoaded = true;
 
@@ -69,7 +82,7 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       const configuration = await readPluginConfiguration(PLUGIN_UNIQUE_ID);
       setSubtitleWriteMode(normalizeWriteMode(configuration.DefaultSubtitleWriteMode));
     } catch {
-      // 配置读取失败时保留默认内封模式，不阻塞详情页控制台。
+      // 读取配置失败时保留默认模式，不阻塞详情页入口。
     }
   }
 
@@ -87,30 +100,37 @@ if (!window.__subtitlesToolsGlobalLoaded) {
     const snapshot = getOverlayState();
     const activePart = getActivePart(snapshot);
     if (!snapshot.itemId || !activePart) {
-      throw new Error('当前没有选中的有效分段。');
+      throw new Error('当前没有选中的有效文件。');
     }
 
-    setStatus(`正在为 ${activePart.Label} 搜索字幕候选…`, 'busy');
+    setStatus('正在搜索字幕', '正在查找可用字幕结果。', 'busy');
     const payload = await searchPart(snapshot.itemId, activePart);
-    setSearchResults(activePart.Id, payload.Items ?? []);
+    const items = payload.Items ?? [];
+    setSearchResults(activePart.Id, items);
     applyOperationResultToPart(activePart.Id, payload);
     await refreshOverlayDataWithRetry(createSinglePartRefreshValidator(activePart.Id, payload));
-    setStatus(`已找到 ${(payload.Items ?? []).length} 条字幕候选。`, 'success');
+
+    if (items.length > 0) {
+      setStatus('已找到字幕', `共找到 ${items.length} 条可用结果。`, 'success');
+      return;
+    }
+
+    setStatus('没有找到字幕', '可以稍后再试，或先优化当前文件。', 'idle');
   }
 
   async function convertCurrentPart(): Promise<void> {
     const snapshot = getOverlayState();
     const activePart = getActivePart(snapshot);
     if (!snapshot.itemId || !activePart) {
-      throw new Error('当前没有选中的有效分段。');
+      throw new Error('当前没有选中的有效文件。');
     }
 
-    setStatus(`正在把 ${activePart.Label} 转换为 MKV…`, 'busy');
+    setStatus('正在优化当前文件', '这一步可能需要一点时间。', 'busy');
     const result = await convertPart(snapshot.itemId, activePart);
     setBatchResults([]);
     applyOperationResultToPart(activePart.Id, result);
     await refreshOverlayDataWithRetry(createSinglePartRefreshValidator(activePart.Id, result));
-    setStatus(result.Message || '当前分段转换完成。', 'success');
+    setStatus('当前文件已优化', '现在可以继续搜索或保存字幕。', 'success');
   }
 
   async function convertCurrentGroup(): Promise<void> {
@@ -119,62 +139,62 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       throw new Error('当前页面没有可管理的媒体详情。');
     }
 
-    setStatus('正在按顺序转换整组分段为 MKV…', 'busy');
+    setStatus('正在优化整组文件', '请不要关闭当前页面。', 'busy');
     const payload = await convertGroup(snapshot.itemId);
     const items = payload.Items ?? [];
     setBatchResults(items);
     applyBatchResults(items);
     await refreshOverlayDataWithRetry(createBatchRefreshValidator(items));
-    setStatus(payload.Message || '整组转换完成。', payload.Status === 'completed' ? 'success' : 'idle');
+    setStatus('整组已优化', '全部文件已完成兼容性处理。', 'success');
   }
 
   async function downloadCurrentCandidate(candidateId: string): Promise<void> {
     const snapshot = getOverlayState();
     const activePart = getActivePart(snapshot);
     if (!snapshot.itemId || !activePart) {
-      throw new Error('当前没有选中的有效分段。');
+      throw new Error('当前没有选中的有效文件。');
     }
 
     const candidate = (snapshot.searchResults.get(activePart.Id) ?? []).find(item => item.Id === candidateId);
     if (!candidate) {
-      throw new Error('未找到对应的字幕候选。');
+      throw new Error('未找到对应的字幕结果。');
     }
 
     const writeMode = snapshot.subtitleWriteMode;
-    const writeModeLabel = getSubtitleWriteModeLabel(writeMode);
-    setStatus(`正在下载并写入 ${candidate.DisplayName || candidate.Name || '当前候选字幕'}，模式：${writeModeLabel}…`, 'busy');
+    const writeModeMessages = getWriteModeMessages(writeMode);
+    const busyTitle = writeMode === 'sidecar' ? '正在保存字幕文件' : '正在写入视频';
+    setStatus(busyTitle, writeModeMessages.busyMessage, 'busy');
     const result = await downloadCandidate(snapshot.itemId, activePart, candidate, writeMode);
     if (result.Status !== 'embedded' && result.Status !== 'sidecar') {
-      throw new Error(result.Message || '字幕写入失败。');
+      throw new Error('保存失败。');
     }
 
     setBatchResults([]);
     applyOperationResultToPart(activePart.Id, result);
     await refreshOverlayDataWithRetry(createSinglePartRefreshValidator(activePart.Id, result));
-    setStatus(result.Message || `字幕已按${writeModeLabel}模式写入当前分段。`, 'success');
+    setStatus(writeModeMessages.successTitle, writeModeMessages.successMessage, 'success');
   }
 
   async function removeEmbeddedSubtitle(streamIndex: number): Promise<void> {
     const snapshot = getOverlayState();
     const activePart = getActivePart(snapshot);
     if (!snapshot.itemId || !activePart) {
-      throw new Error('当前没有选中的有效分段。');
+      throw new Error('当前没有选中的有效文件。');
     }
 
-    const confirmed = window.confirm(`确认删除内封字幕流 #${streamIndex} 吗？当前只允许删除插件写入的字幕流。`);
+    const confirmed = window.confirm(`确认删除字幕轨道 #${streamIndex} 吗？`);
     if (!confirmed) {
-      setStatus('已取消删除。', 'idle');
       return;
     }
 
-    setStatus(`正在删除内封字幕流 #${streamIndex}…`, 'busy');
-    const result = await deletePartEmbeddedSubtitle(snapshot.itemId, activePart, streamIndex);
+    setStatus('正在删除字幕', '请稍候。', 'busy');
+    await deletePartEmbeddedSubtitle(snapshot.itemId, activePart, streamIndex);
     applyDeleteResultToPart(activePart.Id, streamIndex);
     await refreshOverlayDataWithRetry(payload => {
       const refreshedPart = payload.Parts.find(part => part.Id === activePart.Id);
       return !(refreshedPart?.EmbeddedSubtitles ?? []).some(track => track.StreamIndex === streamIndex);
     });
-    setStatus(result.Message || `已删除内封字幕流 #${streamIndex}。`, 'success');
+    setStatus('字幕已删除', '当前列表已经更新。', 'success');
   }
 
   async function runDownloadBest(): Promise<void> {
@@ -183,24 +203,29 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       throw new Error('当前页面没有可管理的媒体详情。');
     }
 
-    const writeModeLabel = getSubtitleWriteModeLabel(snapshot.subtitleWriteMode);
-    setStatus(`正在为整组分段搜索最佳字幕并写入${writeModeLabel}…`, 'busy');
+    setStatus('正在处理整组字幕', '系统会为每个文件自动选择字幕。', 'busy');
     const payload = await downloadBest(snapshot.itemId, snapshot.subtitleWriteMode);
     const items = payload.Items ?? [];
     setBatchResults(items);
     applyBatchResults(items);
     await refreshOverlayDataWithRetry(createBatchRefreshValidator(items));
-    setStatus(payload.Message || `整组字幕${writeModeLabel}写入完成。`, payload.Status === 'completed' ? 'success' : 'idle');
+    setStatus('整组字幕已处理', '请在最近处理结果里查看每个文件的状态。', payload.Status === 'completed' ? 'success' : 'idle');
   }
 
-  async function withBusyState(task: () => Promise<void>): Promise<void> {
+  async function withBusyState(
+    task: () => Promise<void>,
+    failureState: {
+      message: string;
+      title: string;
+    }
+  ): Promise<void> {
     try {
-      setBusy(true);
+      patchOverlayState({ busy: true });
       await task();
-    } catch (error) {
-      setStatus(extractErrorMessage(error), 'error');
+    } catch {
+      setStatus(failureState.title, failureState.message, 'error');
     } finally {
-      setBusy(false);
+      patchOverlayState({ busy: false });
     }
   }
 
@@ -211,27 +236,49 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       <OverlayApp
         actions={{
           closeOverlay,
-          convertCurrentPart: () => withBusyState(convertCurrentPart),
-          convertGroup: () => withBusyState(convertCurrentGroup),
-          deleteEmbeddedSubtitle: (streamIndex: number) => withBusyState(() => removeEmbeddedSubtitle(streamIndex)),
-          downloadBest: () => withBusyState(runDownloadBest),
-          downloadCandidate: (candidateId: string) => withBusyState(() => downloadCurrentCandidate(candidateId)),
-          refresh: () => withBusyState(async () => {
-            setStatus('正在刷新分段状态…', 'busy');
-            await refreshOverlayData();
-            setStatus('分段状态已刷新。', 'success');
+          convertCurrentPart: () => withBusyState(convertCurrentPart, {
+            title: '优化失败',
+            message: '请检查视频文件和转码环境。'
           }),
-          searchCurrentPart: () => withBusyState(searchCurrentPart),
+          convertGroup: () => withBusyState(convertCurrentGroup, {
+            title: '优化失败',
+            message: '请检查视频文件和转码环境。'
+          }),
+          deleteEmbeddedSubtitle: (streamIndex: number) => withBusyState(() => removeEmbeddedSubtitle(streamIndex), {
+            title: '删除失败',
+            message: '请稍后重试。'
+          }),
+          downloadBest: () => withBusyState(runDownloadBest, {
+            title: '保存失败',
+            message: '请稍后重试。'
+          }),
+          downloadCandidate: (candidateId: string) => withBusyState(() => downloadCurrentCandidate(candidateId), {
+            title: '保存失败',
+            message: '请稍后重试。'
+          }),
+          refresh: () => withBusyState(async () => {
+            setStatus('正在读取当前状态', '请稍候。', 'busy');
+            await refreshOverlayData();
+            setStatus('状态已更新', '当前文件信息已刷新。', 'success');
+          }, {
+            title: '读取媒体失败',
+            message: '请刷新页面后重试。'
+          }),
+          searchCurrentPart: () => withBusyState(searchCurrentPart, {
+            title: '搜索失败',
+            message: '请检查服务连接后重试。'
+          }),
           selectPart: (partId: string) => {
             patchOverlayState({
               activePartId: partId,
+              statusTitle: '',
               statusMessage: '',
               statusTone: 'idle'
             });
           },
           setSubtitleWriteMode: (mode: SubtitleWriteMode) => {
             setSubtitleWriteMode(mode);
-            setStatus(`当前写入模式已切换为${getSubtitleWriteModeLabel(mode)}。`, 'idle');
+            setStatus('保存方式已切换', '接下来会按当前方式保存字幕。', 'idle');
           }
         }}
         state={snapshot}

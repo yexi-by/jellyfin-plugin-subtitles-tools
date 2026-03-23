@@ -1,22 +1,20 @@
-[
-  {
-    "guid": "b812b763-a31d-4d19-bfcc-15b9eac432cb",
-    "name": "Subtitles Tools",
-    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供视频自动纳管至 MKV、MKV 元数据 CID/GCID、字幕转 SRT 以及 MKV 软字幕内封能力。",
-    "overview": "插件只处理本地 Movie 和 Episode 文件。它会把视频统一纳管到 MKV，在 MKV 元数据中保存插件使用的 CID/GCID，并在详情页提供内封字幕管理入口，支持逐段或整组转换为 MKV、搜索迅雷字幕、下载后自动转临时 SRT 并写入 MKV，最终不再依赖外挂字幕文件。",
-    "owner": "yexi-by",
-    "category": "Metadata",
-    "repositoryUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools",
-    "repositoryName": "yexi-by/jellyfin-plugin-subtitles-tools",
-    "versions": [
-      {
-        "version": "0.7.2.1",
-        "changelog": "新增字幕写入双模式：可选内封到 MKV，或直接生成同目录外挂字幕；设置页支持默认写入模式，详情页字幕控制台支持即时切换、外挂字幕列表展示和动态任务反馈；同时补齐对应前后端测试与发布链兼容性修复。",
-        "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.2.1/Jellyfin.Plugin.SubtitlesTools_0.7.2.1.zip",
-        "checksum": "EB89AA23A1ECA210AD8126A4E8B3907E",
-        "timestamp": "2026-03-23T06:32:53Z"
-      }
-    ]
-  }
-]
+﻿{
+    "guid":  "b812b763-a31d-4d19-bfcc-15b9eac432cb",
+    "name":  "Subtitles Tools",
+    "description":  "通过 subtitles-tools Python 服务为 Jellyfin 提供视频自动纳管至 MKV、MKV 元数据 CID/GCID、字幕转 SRT 以及 MKV 软字幕内封能力。",
+    "overview":  "插件只处理本地 Movie 和 Episode 文件。它会把视频统一纳管到 MKV，在 MKV 元数据中保存插件使用的 CID/GCID，并在详情页提供内封字幕管理入口，支持逐段或整组转换为 MKV、搜索迅雷字幕、下载后自动转临时 SRT 并写入 MKV，最终不再依赖外挂字幕文件。",
+    "owner":  "yexi-by",
+    "category":  "Metadata",
+    "repositoryUrl":  "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools",
+    "repositoryName":  "yexi-by/jellyfin-plugin-subtitles-tools",
+    "versions":  [
+                     {
+                         "version":  "0.7.2.2",
+                         "changelog":  "重写插件 WebUI 的用户文案与信息架构：设置页改为服务连接、常规设置和高级设置三段式；字幕控制台改为当前文件操作、整组操作、找到的字幕、已有字幕和最近处理结果，并补齐结果优先的状态反馈与手机、平板、桌面响应式布局。",
+                         "targetAbi":  "10.11.0.0",
+                         "sourceUrl":  "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.2.2/Jellyfin.Plugin.SubtitlesTools_0.7.2.2.zip",
+                         "checksum":  "EB89AA23A1ECA210AD8126A4E8B3907E",
+                         "timestamp":  "2026-03-23T06:32:53Z"
+                     }
+                 ]
+}

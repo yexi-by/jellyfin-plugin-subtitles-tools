@@ -37,7 +37,7 @@ describe('ConfigPageApp', () => {
     });
   });
 
-  it('加载配置后展示表单值，并在连接检测成功后渲染结构化状态', async () => {
+  it('加载配置后显示表单，并在连接检测成功后渲染结构化状态', async () => {
     requestJson.mockResolvedValue({
       Ffmpeg: {
         ffmpegPath: '/usr/bin/ffmpeg',
@@ -60,7 +60,7 @@ describe('ConfigPageApp', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
 
-    expect(await screen.findByText('服务链路已经准备就绪')).toBeInTheDocument();
+    expect(await screen.findByText('连接正常')).toBeInTheDocument();
     expect(screen.getByText('服务版本')).toBeInTheDocument();
     expect(screen.getByText('ZiMuKu')).toBeInTheDocument();
     expect(requestJson).toHaveBeenCalledWith(
@@ -82,7 +82,7 @@ describe('ConfigPageApp', () => {
     fireEvent.change(serviceInput, {
       target: { value: 'http://localhost:9000' }
     });
-    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存设置' }));
 
     await waitFor(() => {
       expect(savePluginConfiguration).toHaveBeenCalledWith(

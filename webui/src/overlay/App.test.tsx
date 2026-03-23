@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { OverlayApp } from './App';
 import type { OverlayStoreState } from './store';
@@ -65,7 +65,7 @@ function buildState(): OverlayStoreState {
     lastBatchItems: [
       {
         Label: 'Part 1',
-        Message: '已完成处理',
+        Message: '已保存外挂字幕。',
         PartId: 'part-1',
         Status: 'sidecar',
         WriteMode: 'sidecar'
@@ -86,14 +86,15 @@ function buildState(): OverlayStoreState {
         ]
       ]
     ]),
-    statusMessage: '最近一次操作成功。',
+    statusTitle: '状态已更新',
+    statusMessage: '当前文件信息已刷新。',
     statusTone: 'success',
     subtitleWriteMode: 'sidecar'
   };
 }
 
 describe('OverlayApp', () => {
-  it('渲染当前媒体概览、外挂信息并分发关键操作事件', () => {
+  it('渲染当前媒体概览、整组操作和关键交互入口', () => {
     const actions = {
       closeOverlay: vi.fn(),
       convertCurrentPart: vi.fn(async () => undefined),
@@ -110,20 +111,33 @@ describe('OverlayApp', () => {
     render(<OverlayApp actions={actions} state={buildState()} />);
 
     expect(screen.getByText('示例影片')).toBeInTheDocument();
-    expect(screen.getByText('外挂字幕总数')).toBeInTheDocument();
-    expect(screen.getAllByText('movie-part-1.zho.srt')).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: '找到的字幕' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '已有字幕' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '整组操作' })).toBeInTheDocument();
+    expect(screen.getByText('外挂字幕')).toBeInTheDocument();
+    expect(screen.getByText('视频内字幕')).toBeInTheDocument();
+    expect(screen.getByText('由本工具添加')).toBeInTheDocument();
+    expect(screen.getByText('movie-part-1.zho.srt')).toBeInTheDocument();
     expect(screen.getByText('候选字幕一')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '下载并写为外挂字幕' }));
+    const candidateRow = screen.getByText('候选字幕一').closest('div.rounded-lg');
+    expect(candidateRow).not.toBeNull();
+    fireEvent.click(within(candidateRow as HTMLElement).getByRole('button', { name: '另存字幕' }));
     expect(actions.downloadCandidate).toHaveBeenCalledWith('candidate-1');
 
-    fireEvent.click(screen.getAllByRole('button', { name: /内封字幕/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: '写入视频' })[0]);
     expect(actions.setSubtitleWriteMode).toHaveBeenCalledWith('embedded');
 
-    fireEvent.click(screen.getByRole('button', { name: /Part 2/ }));
+    fireEvent.click(screen.getByRole('button', { name: '整组优化' }));
+    expect(actions.convertGroup).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '整组自动选字幕' }));
+    expect(actions.downloadBest).toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Part 2/ })[0]);
     expect(actions.selectPart).toHaveBeenCalledWith('part-2');
 
-    fireEvent.click(screen.getByRole('button', { name: '关闭字幕控制台' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     expect(actions.closeOverlay).toHaveBeenCalled();
-});
+  });
 });
