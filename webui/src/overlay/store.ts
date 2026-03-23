@@ -1,5 +1,5 @@
 import { API_ROOT, REFRESH_RETRY_ATTEMPTS, REFRESH_RETRY_DELAY_MS } from '../shared/constants';
-import { getCurrentItemId, sleep } from '../shared/dom';
+import { getCurrentItemId, isCurrentDetailsRoute, sleep } from '../shared/dom';
 import { requestJson } from '../shared/runtime';
 import type {
   ItemPartsPayload,
@@ -124,13 +124,29 @@ export async function fetchParts(itemId: string, forceReload: boolean): Promise<
 
 export async function refreshCurrentPageState(forceReload: boolean): Promise<void> {
   const locationSignature = `${window.location.pathname}|${window.location.search}|${window.location.hash}`;
-  if (!forceReload && state.lastLocation === locationSignature) {
+  const isDetailsRoute = isCurrentDetailsRoute();
+  if (!forceReload && state.lastLocation === locationSignature && !(isDetailsRoute && !state.itemData)) {
     return;
   }
 
-  patchOverlayState({ lastLocation: locationSignature });
   const itemId = getCurrentItemId();
   if (!itemId) {
+    if (isDetailsRoute) {
+      patchOverlayState({
+        activePartId: null,
+        isFabVisible: false,
+        isOverlayOpen: false,
+        itemData: null,
+        itemId: null,
+        lastBatchItems: [],
+        searchResults: new Map<string, SubtitleCandidate[]>(),
+        statusTitle: '',
+        statusMessage: '',
+        statusTone: 'idle'
+      });
+      return;
+    }
+
     replaceOverlayState({
       ...initialState,
       lastLocation: locationSignature,
@@ -139,9 +155,18 @@ export async function refreshCurrentPageState(forceReload: boolean): Promise<voi
     return;
   }
 
+  patchOverlayState({ lastLocation: locationSignature });
   try {
     await fetchParts(itemId, forceReload);
-    patchOverlayState({ isFabVisible: true });
+    const shouldClearLoadError = state.statusTone === 'error' && state.statusTitle === '读取媒体失败';
+    patchOverlayState(shouldClearLoadError
+      ? {
+          isFabVisible: true,
+          statusTitle: '',
+          statusMessage: '',
+          statusTone: 'idle'
+        }
+      : { isFabVisible: true });
   } catch {
     replaceOverlayState({
       ...initialState,

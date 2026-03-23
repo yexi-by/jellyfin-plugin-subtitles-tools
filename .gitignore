@@ -9,5 +9,6 @@ artifacts/
 release-assets/
 webui/node_modules/
 webui/dist/
+webui/dist-debug/
 webui/coverage/
 webui/.vitest/

@@ -34,9 +34,23 @@ function extractGuid(source: string | undefined): string | null {
   return null;
 }
 
+function hasDetailsRoute(source: string | undefined): boolean {
+  if (!source) {
+    return false;
+  }
+
+  return /(?:^|#)\/details(?:[/?&]|$)/i.test(source) || /\/details\/[0-9a-fA-F-]{32,36}/i.test(source);
+}
+
 export function getCurrentItemId(): string | null {
   return extractGuid(window.location.hash)
     ?? extractGuid(window.location.search)
     ?? extractGuid(window.location.pathname)
     ?? extractGuid(window.location.href);
+}
+
+export function isCurrentDetailsRoute(): boolean {
+  return hasDetailsRoute(window.location.hash)
+    || hasDetailsRoute(window.location.pathname)
+    || hasDetailsRoute(window.location.href);
 }
