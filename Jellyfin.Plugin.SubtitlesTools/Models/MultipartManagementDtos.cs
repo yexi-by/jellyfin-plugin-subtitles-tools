@@ -174,6 +174,18 @@ public sealed class ManagedDeleteEmbeddedSubtitleResponseDto
     public int DeletedStreamIndex { get; set; }
 }
 
+public sealed class ManagedDeleteExternalSubtitleRequestDto
+{
+    public string FilePath { get; set; } = string.Empty;
+}
+
+public sealed class ManagedDeleteExternalSubtitleResponseDto
+{
+    public string Status { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public string DeletedExternalSubtitlePath { get; set; } = string.Empty;
+}
+
 public sealed class ManagedDownloadBestRequestDto
 {
     public string WriteMode { get; set; } = string.Empty;

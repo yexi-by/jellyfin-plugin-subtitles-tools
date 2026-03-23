@@ -20,6 +20,7 @@ import {
   getItemMetrics,
   getManagedStatusText,
   getManagedStatusTone,
+  getSubtitleSourceScoreText,
   getSubtitleWriteModeLabel
 } from '../shared/formatters';
 import type { EmbeddedSubtitleTrack, ExternalSubtitleTrack, MediaPart, OperationResultItem, SubtitleCandidate, SubtitleWriteMode } from '../shared/types';
@@ -30,6 +31,7 @@ interface OverlayActions {
   convertCurrentPart: () => Promise<void>;
   convertGroup: () => Promise<void>;
   deleteEmbeddedSubtitle: (streamIndex: number) => Promise<void>;
+  deleteExternalSubtitle: (filePath: string) => Promise<void>;
   downloadBest: () => Promise<void>;
   downloadCandidate: (candidateId: string) => Promise<void>;
   refresh: () => Promise<void>;
@@ -134,11 +136,13 @@ function SubtitleTrackRow({
 function SubtitleList({
   embedded,
   external,
-  onDelete
+  onDeleteEmbedded,
+  onDeleteExternal
 }: {
   embedded: EmbeddedSubtitleTrack[] | undefined;
   external: ExternalSubtitleTrack[] | undefined;
-  onDelete: (streamIndex: number) => Promise<void>;
+  onDeleteEmbedded: (streamIndex: number) => Promise<void>;
+  onDeleteExternal: (filePath: string) => Promise<void>;
 }): JSX.Element {
   const embeddedTracks = embedded ?? [];
   const externalTracks = external ?? [];
@@ -153,7 +157,7 @@ function SubtitleList({
       {embeddedTracks.map(track => (
         <SubtitleTrackRow
           key={`embedded-${track.StreamIndex}`}
-          action={track.IsPluginManaged ? () => void onDelete(track.StreamIndex) : undefined}
+          action={track.IsPluginManaged ? () => void onDeleteEmbedded(track.StreamIndex) : undefined}
           actionLabel={track.IsPluginManaged ? '删除' : undefined}
           badges={[
             <Badge key="kind" tone="neutral">视频内字幕</Badge>,
@@ -163,14 +167,19 @@ function SubtitleList({
           title={track.Title || `字幕轨道 #${track.StreamIndex}`}
         />
       ))}
-      {externalTracks.map(track => (
-        <SubtitleTrackRow
-          key={`external-${track.FilePath || track.FileName}`}
-          badges={[<Badge key="kind" tone="neutral">外挂字幕</Badge>]}
-          meta={`语言：${track.Language || '未知'} · 格式：${(track.Format || 'srt').toUpperCase()}`}
-          title={track.FileName || '外挂字幕'}
-        />
-      ))}
+      {externalTracks.map(track => {
+        const filePath = track.FilePath;
+        return (
+          <SubtitleTrackRow
+            key={`external-${filePath || track.FileName}`}
+            action={filePath ? () => void onDeleteExternal(filePath) : undefined}
+            actionLabel={filePath ? '删除' : undefined}
+            badges={[<Badge key="kind" tone="neutral">外挂字幕</Badge>]}
+            meta={`语言：${track.Language || '未知'} · 格式：${(track.Format || 'srt').toUpperCase()}`}
+            title={track.FileName || '外挂字幕'}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -193,7 +202,7 @@ function CandidateList({
   return (
     <div className="flex flex-col gap-3">
       {candidates.map(candidate => {
-        const score = typeof candidate.Score === 'number' || typeof candidate.Score === 'string' ? String(candidate.Score) : '-';
+        const score = getSubtitleSourceScoreText(candidate.Score);
         const language = candidate.Language || candidate.Languages?.join(', ') || '未知';
         const format = (candidate.Format || candidate.Ext || 'srt').toUpperCase();
 
@@ -206,7 +215,7 @@ function CandidateList({
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                 <span className="rounded bg-black/20 px-1.5 py-0.5">语言：{language}</span>
                 <span className="rounded bg-black/20 px-1.5 py-0.5">格式：{format}</span>
-                <span className="rounded bg-black/20 px-1.5 py-0.5">匹配度：{score}</span>
+                <span className="rounded bg-black/20 px-1.5 py-0.5">来源评分：{score}</span>
               </div>
             </div>
             <Button className="w-full sm:w-auto" type="button" variant="primary" onClick={() => void onDownload(candidate.Id)}>
@@ -405,7 +414,12 @@ export function OverlayApp({
 
               <section className="flex flex-col gap-3">
                 <SectionHeading title="已有字幕" />
-                <SubtitleList embedded={activePart?.EmbeddedSubtitles} external={activePart?.ExternalSubtitles} onDelete={actions.deleteEmbeddedSubtitle} />
+                <SubtitleList
+                  embedded={activePart?.EmbeddedSubtitles}
+                  external={activePart?.ExternalSubtitles}
+                  onDeleteEmbedded={actions.deleteEmbeddedSubtitle}
+                  onDeleteExternal={actions.deleteExternalSubtitle}
+                />
               </section>
 
               <BatchSummary items={state.lastBatchItems} />

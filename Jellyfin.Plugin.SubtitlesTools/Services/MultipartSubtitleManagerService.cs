@@ -325,6 +325,43 @@ public sealed class MultipartSubtitleManagerService
     }
 
     /// <summary>
+    /// 删除当前分段目录中的一条外挂字幕文件。
+    /// 这里只删除当前媒体同目录、且当前列表中已识别到的 sidecar 字幕，避免误删其它文件。
+    /// </summary>
+    public async Task<ManagedDeleteExternalSubtitleResponseDto> DeleteExternalSubtitleAsync(
+        Guid itemId,
+        string partId,
+        ManagedDeleteExternalSubtitleRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (string.IsNullOrWhiteSpace(partId))
+        {
+            throw new ArgumentException("分段标识不能为空。", nameof(partId));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.FilePath))
+        {
+            throw new ArgumentException("外挂字幕路径不能为空。", nameof(request));
+        }
+
+        var context = await ResolveContextAsync(itemId, cancellationToken).ConfigureAwait(false);
+        var part = GetPart(context, partId);
+        await _externalSubtitleService
+            .DeleteExternalSubtitleAsync(part.MediaFile, request.FilePath, cancellationToken)
+            .ConfigureAwait(false);
+        QueueItemRefresh(context.Item);
+
+        return new ManagedDeleteExternalSubtitleResponseDto
+        {
+            Status = "deleted",
+            Message = "外挂字幕已删除。",
+            DeletedExternalSubtitlePath = request.FilePath
+        };
+    }
+
+    /// <summary>
     /// 为所有分段分别搜索并写入第一名字幕候选。
     /// 每个分段都会先完成纳管和兼容修复，再进入字幕搜索与字幕写入。
     /// </summary>

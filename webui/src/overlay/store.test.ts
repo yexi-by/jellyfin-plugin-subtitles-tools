@@ -82,6 +82,48 @@ describe('overlay store error recovery', () => {
     ]);
   });
 
+  it('removes external subtitles from the active part after delete', async () => {
+    vi.doMock('../shared/dom', () => ({
+      getCurrentItemId: () => 'item-1',
+      isCurrentDetailsRoute: () => true,
+      sleep: async () => undefined
+    }));
+    vi.doMock('../shared/runtime', () => ({
+      readItemType: vi.fn(async () => 'Movie'),
+      requestJson: vi.fn()
+    }));
+
+    const store = await import('./store');
+    store.applyPartsPayload('item-1', {
+      CurrentPartId: 'part-1',
+      IsMultipart: false,
+      ItemType: 'Movie',
+      Name: '示例影片',
+      Parts: [
+        {
+          EmbeddedSubtitles: [],
+          ExternalSubtitles: [
+            {
+              FileName: 'movie.zho.srt',
+              FilePath: '/media/movie.zho.srt',
+              Format: 'srt',
+              Language: 'zho'
+            }
+          ],
+          Id: 'part-1',
+          Index: 1,
+          IsManaged: true,
+          Label: 'Part 1',
+          MediaPath: '/media/movie.mkv'
+        }
+      ]
+    });
+
+    store.applyDeleteExternalResultToPart('part-1', '/media/movie.zho.srt');
+
+    expect(store.getOverlayState().itemData?.Parts[0].ExternalSubtitles).toEqual([]);
+  });
+
   it('retries loading when the details route is ready before the item id is ready', async () => {
     const getCurrentItemId = vi
       .fn<() => string | null>()

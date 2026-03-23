@@ -273,6 +273,13 @@ export function applyDeleteResultToPart(partId: string, deletedStreamIndex: numb
   });
 }
 
+export function applyDeleteExternalResultToPart(partId: string, deletedFilePath: string): void {
+  updateManagedPart(partId, part => {
+    part.ExternalSubtitles = (part.ExternalSubtitles ?? []).filter(track => track.FilePath !== deletedFilePath);
+    return part;
+  });
+}
+
 export function applyBatchResults(items: OperationResultItem[]): void {
   items.forEach(item => {
     if (item.IsManaged === true || item.Status === 'converted' || item.Status === 'embedded' || item.Status === 'sidecar') {
@@ -443,6 +450,12 @@ export async function downloadCandidate(
 export async function deletePartEmbeddedSubtitle(itemId: string, part: MediaPart, streamIndex: number): Promise<OperationResultItem> {
   return requestJson<OperationResultItem>(`${API_ROOT}/Items/${itemId}/parts/${part.Id}/delete-embedded-subtitle`, 'POST', {
     StreamIndex: streamIndex
+  });
+}
+
+export async function deletePartExternalSubtitle(itemId: string, part: MediaPart, filePath: string): Promise<OperationResultItem> {
+  return requestJson<OperationResultItem>(`${API_ROOT}/Items/${itemId}/parts/${part.Id}/delete-external-subtitle`, 'POST', {
+    FilePath: filePath
   });
 }
 

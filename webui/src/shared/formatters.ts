@@ -270,3 +270,25 @@ export function getDefaultOverlayStatus(part: MediaPart | null): {
 export function getSubtitleWriteModeLabel(mode: SubtitleWriteMode): string {
   return mode === 'sidecar' ? '另存字幕' : '写入视频';
 }
+
+export function getSubtitleSourceScoreText(score: number | string | undefined): string {
+  if (score === undefined || score === null) {
+    return '未提供评分';
+  }
+
+  if (typeof score === 'number') {
+    return score === 0 ? '未提供评分' : String(score);
+  }
+
+  const normalizedScore = score.trim();
+  if (!normalizedScore) {
+    return '未提供评分';
+  }
+
+  const parsedScore = Number(normalizedScore);
+  if (Number.isFinite(parsedScore) && parsedScore === 0) {
+    return '未提供评分';
+  }
+
+  return normalizedScore;
+}

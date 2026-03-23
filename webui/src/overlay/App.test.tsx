@@ -82,6 +82,13 @@ function buildState(): OverlayStoreState {
             Language: 'zh-CN',
             Score: 98,
             SidecarFileName: 'movie-part-1.zho.srt'
+          },
+          {
+            DisplayName: '候选字幕二',
+            Id: 'candidate-2',
+            Language: 'zh-CN',
+            Score: 0,
+            SidecarFileName: 'movie-part-1.und.srt'
           }
         ]
       ]
@@ -100,6 +107,7 @@ describe('OverlayApp', () => {
       convertCurrentPart: vi.fn(async () => undefined),
       convertGroup: vi.fn(async () => undefined),
       deleteEmbeddedSubtitle: vi.fn(async () => undefined),
+      deleteExternalSubtitle: vi.fn(async () => undefined),
       downloadBest: vi.fn(async () => undefined),
       downloadCandidate: vi.fn(async () => undefined),
       refresh: vi.fn(async () => undefined),
@@ -119,6 +127,9 @@ describe('OverlayApp', () => {
     expect(screen.getByText('由本工具添加')).toBeInTheDocument();
     expect(screen.getByText('movie-part-1.zho.srt')).toBeInTheDocument();
     expect(screen.getByText('候选字幕一')).toBeInTheDocument();
+    expect(screen.getByText('候选字幕二')).toBeInTheDocument();
+    expect(screen.getByText('来源评分：98')).toBeInTheDocument();
+    expect(screen.getByText('来源评分：未提供评分')).toBeInTheDocument();
 
     const candidateRow = screen.getByText('候选字幕一').closest('div.rounded-lg');
     expect(candidateRow).not.toBeNull();
@@ -133,6 +144,11 @@ describe('OverlayApp', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '整组自动选字幕' }));
     expect(actions.downloadBest).toHaveBeenCalled();
+
+    const externalRow = screen.getByText('movie-part-1.zho.srt').closest('div.rounded-lg');
+    expect(externalRow).not.toBeNull();
+    fireEvent.click(within(externalRow as HTMLElement).getByRole('button', { name: '删除' }));
+    expect(actions.deleteExternalSubtitle).toHaveBeenCalledWith('/media/movie-part-1.zho.srt');
 
     fireEvent.click(screen.getAllByRole('button', { name: /Part 2/ })[0]);
     expect(actions.selectPart).toHaveBeenCalledWith('part-2');

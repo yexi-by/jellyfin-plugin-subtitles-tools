@@ -118,6 +118,7 @@ export interface OperationResultItem {
   WriteMode?: SubtitleWriteMode;
   EmbeddedSubtitle?: EmbeddedSubtitleTrack;
   ExternalSubtitle?: ExternalSubtitleTrack;
+  DeletedExternalSubtitlePath?: string;
 }
 
 export interface OperationBatchPayload {

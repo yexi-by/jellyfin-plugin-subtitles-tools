@@ -7,6 +7,7 @@ import type { SubtitleWriteMode } from '../shared/types';
 import { FloatingButton, OverlayApp } from './App';
 import {
   applyBatchResults,
+  applyDeleteExternalResultToPart,
   applyDeleteResultToPart,
   applyOperationResultToPart,
   applyPartsPayload,
@@ -16,6 +17,7 @@ import {
   createBatchRefreshValidator,
   createSinglePartRefreshValidator,
   deletePartEmbeddedSubtitle,
+  deletePartExternalSubtitle,
   downloadBest,
   downloadCandidate,
   fetchPartsPayload,
@@ -188,6 +190,32 @@ if (!window.__subtitlesToolsGlobalLoaded) {
     setStatus('字幕已删除', '当前列表已经更新。', 'success');
   }
 
+  async function removeExternalSubtitle(filePath: string): Promise<void> {
+    const snapshot = getOverlayState();
+    const activePart = getActivePart(snapshot);
+    if (!snapshot.itemId || !activePart) {
+      throw new Error('当前没有选中的有效文件。');
+    }
+
+    const trackName = activePart.ExternalSubtitles?.find(track => track.FilePath === filePath)?.FileName ?? '该外挂字幕';
+    const confirmed = window.confirm(`确认删除 ${trackName} 吗？`);
+    if (!confirmed) {
+      return;
+    }
+
+    setStatus('正在删除字幕', '请稍候。', 'busy');
+    const result = await deletePartExternalSubtitle(snapshot.itemId, activePart, filePath);
+    const deletedFilePath = typeof result.DeletedExternalSubtitlePath === 'string' && result.DeletedExternalSubtitlePath
+      ? result.DeletedExternalSubtitlePath
+      : filePath;
+    applyDeleteExternalResultToPart(activePart.Id, deletedFilePath);
+    await refreshOverlayDataWithRetry(payload => {
+      const refreshedPart = payload.Parts.find(part => part.Id === activePart.Id);
+      return !(refreshedPart?.ExternalSubtitles ?? []).some(track => track.FilePath === deletedFilePath);
+    });
+    setStatus('字幕已删除', '当前列表已经更新。', 'success');
+  }
+
   async function runDownloadBest(): Promise<void> {
     const snapshot = getOverlayState();
     if (!snapshot.itemId) {
@@ -243,6 +271,10 @@ if (!window.__subtitlesToolsGlobalLoaded) {
             message: '请检查视频文件和转码环境。'
           }),
           deleteEmbeddedSubtitle: (streamIndex: number) => withBusyState(() => removeEmbeddedSubtitle(streamIndex), {
+            title: '删除失败',
+            message: '请稍后重试。'
+          }),
+          deleteExternalSubtitle: (filePath: string) => withBusyState(() => removeExternalSubtitle(filePath), {
             title: '删除失败',
             message: '请稍后重试。'
           }),

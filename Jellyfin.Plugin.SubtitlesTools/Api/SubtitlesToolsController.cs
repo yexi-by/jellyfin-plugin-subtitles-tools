@@ -366,6 +366,48 @@ public sealed class SubtitlesToolsController : ControllerBase
     }
 
     /// <summary>
+    /// 删除当前分段中的一条外挂字幕文件。
+    /// </summary>
+    [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts/{partId}/delete-external-subtitle")]
+    [ProducesResponseType(typeof(ManagedDeleteExternalSubtitleResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ManagedDeleteExternalSubtitleResponseDto>> DeleteExternalSubtitle(
+        [FromRoute] Guid itemId,
+        [FromRoute] string partId,
+        [FromBody] ManagedDeleteExternalSubtitleRequestDto body,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+
+        try
+        {
+            var result = await _multipartSubtitleManagerService.DeleteExternalSubtitleAsync(itemId, partId, body, cancellationToken).ConfigureAwait(false);
+            return Ok(result);
+        }
+        catch (FileNotFoundException ex)
+        {
+            return NotFound(new { Message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+        catch (IOException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// 为所有分段分别搜索并写入第一名字幕候选。
     /// </summary>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/download-best")]

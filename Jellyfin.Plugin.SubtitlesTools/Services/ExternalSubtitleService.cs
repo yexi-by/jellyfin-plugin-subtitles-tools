@@ -103,6 +103,45 @@ public sealed class ExternalSubtitleService
     }
 
     /// <summary>
+    /// 删除当前媒体同目录的一条外挂字幕。
+    /// 这里会先按当前媒体重新枚举可识别的外挂字幕，只允许删除当前列表里真实存在的文件，避免误删其它路径。
+    /// </summary>
+    /// <param name="mediaFile">目标媒体文件。</param>
+    /// <param name="subtitleFilePath">要删除的外挂字幕绝对路径。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    public Task DeleteExternalSubtitleAsync(
+        FileInfo mediaFile,
+        string subtitleFilePath,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mediaFile);
+        ArgumentException.ThrowIfNullOrWhiteSpace(subtitleFilePath);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!mediaFile.Exists)
+        {
+            throw new FileNotFoundException("目标媒体文件不存在。", mediaFile.FullName);
+        }
+
+        var subtitle = GetExternalSubtitles(mediaFile).FirstOrDefault(item =>
+            string.Equals(item.FilePath, subtitleFilePath, StringComparison.OrdinalIgnoreCase));
+        if (subtitle is null)
+        {
+            throw new InvalidOperationException("未找到可删除的外挂字幕。");
+        }
+
+        var subtitleFile = new FileInfo(subtitle.FilePath);
+        if (!subtitleFile.Exists)
+        {
+            throw new FileNotFoundException("外挂字幕文件不存在。", subtitleFile.FullName);
+        }
+
+        subtitleFile.Delete();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// 构建外挂字幕建议文件名。
     /// </summary>
     /// <param name="mediaFile">媒体文件。</param>
