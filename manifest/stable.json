@@ -14,8 +14,8 @@
         "changelog": "修复字幕控制台弹层显隐回归，解决点击“字幕控制台”按钮后界面仍保持隐藏、看起来像完全打不开的问题；保留手机、平板与横竖屏响应式布局改造，并让新版脚本随版本号重新下发，减少旧缓存导致的前端失效现象。",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.2.1/Jellyfin.Plugin.SubtitlesTools_0.7.2.1.zip",
-        "checksum": "6B7B7B086816B1C30D565903089B445A",
-        "timestamp": "2026-03-22T20:04:50Z"
+        "checksum": "EB89AA23A1ECA210AD8126A4E8B3907E",
+        "timestamp": "2026-03-23T06:32:53Z"
       }
     ]
   }
