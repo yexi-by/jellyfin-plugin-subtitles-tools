@@ -13,6 +13,7 @@ describe('overlay store error recovery', () => {
       sleep: async () => undefined
     }));
     vi.doMock('../shared/runtime', () => ({
+      readItemType: vi.fn(async () => 'Movie'),
       requestJson: vi.fn(async () => {
         throw new Error('请求失败，状态码 500。');
       })
@@ -36,6 +37,7 @@ describe('overlay store error recovery', () => {
       sleep: async () => undefined
     }));
     vi.doMock('../shared/runtime', () => ({
+      readItemType: vi.fn(async () => 'Movie'),
       requestJson: vi.fn()
     }));
 
@@ -109,6 +111,7 @@ describe('overlay store error recovery', () => {
       sleep: async () => undefined
     }));
     vi.doMock('../shared/runtime', () => ({
+      readItemType: vi.fn(async () => 'Movie'),
       requestJson
     }));
 
@@ -159,6 +162,7 @@ describe('overlay store error recovery', () => {
       sleep: async () => undefined
     }));
     vi.doMock('../shared/runtime', () => ({
+      readItemType: vi.fn(async () => 'Movie'),
       requestJson
     }));
 
@@ -182,5 +186,30 @@ describe('overlay store error recovery', () => {
       statusTone: 'idle'
     });
     expect(store.getOverlayState().itemData?.Name).toBe('示例影片');
+  });
+
+  it('hides the floating entry on person details pages', async () => {
+    const requestJson = vi.fn();
+
+    vi.doMock('../shared/dom', () => ({
+      getCurrentItemId: () => 'person-1',
+      isCurrentDetailsRoute: () => true,
+      sleep: async () => undefined
+    }));
+    vi.doMock('../shared/runtime', () => ({
+      readItemType: vi.fn(async () => 'Person'),
+      requestJson
+    }));
+
+    const store = await import('./store');
+    await store.refreshCurrentPageState(true);
+
+    expect(requestJson).not.toHaveBeenCalled();
+    expect(store.getOverlayState()).toMatchObject({
+      isFabVisible: false,
+      isOverlayOpen: false,
+      itemData: null,
+      itemId: null
+    });
   });
 });

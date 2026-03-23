@@ -6,13 +6,19 @@ export interface JellyfinAjaxResponse {
   status: number;
 }
 
+interface JellyfinServerInfo {
+  UserId?: string;
+}
+
 export interface JellyfinApiClient {
+  _serverInfo?: JellyfinServerInfo;
   ajax: (options: {
     contentType?: string;
     data?: string;
     type: 'GET' | 'POST';
     url: string;
   }) => Promise<JellyfinAjaxResponse>;
+  getCurrentUserId?: () => string | null;
   getPluginConfiguration: (pluginId: string) => Promise<PluginConfiguration>;
   getUrl: (path: string) => string;
   updatePluginConfiguration: (pluginId: string, config: PluginConfiguration) => Promise<unknown>;
@@ -69,6 +75,17 @@ export async function requestJson<T>(path: string, method: 'GET' | 'POST', body?
 
 export function readPluginConfiguration(pluginId: string): Promise<PluginConfiguration> {
   return getApiClient().getPluginConfiguration(pluginId);
+}
+
+export async function readItemType(itemId: string): Promise<string | null> {
+  const apiClient = getApiClient();
+  const userId = apiClient.getCurrentUserId?.() ?? apiClient._serverInfo?.UserId ?? null;
+  if (!userId) {
+    return null;
+  }
+
+  const item = await requestJson<{ Type?: string }>(`Users/${userId}/Items/${itemId}`, 'GET');
+  return typeof item.Type === 'string' ? item.Type : null;
 }
 
 export function savePluginConfiguration(pluginId: string, configuration: PluginConfiguration): Promise<unknown> {

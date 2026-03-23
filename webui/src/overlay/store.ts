@@ -1,6 +1,6 @@
 import { API_ROOT, REFRESH_RETRY_ATTEMPTS, REFRESH_RETRY_DELAY_MS } from '../shared/constants';
 import { getCurrentItemId, isCurrentDetailsRoute, sleep } from '../shared/dom';
-import { requestJson } from '../shared/runtime';
+import { readItemType, requestJson } from '../shared/runtime';
 import type {
   ItemPartsPayload,
   MediaPart,
@@ -37,6 +37,10 @@ const initialState: OverlayStoreState = {
 
 const listeners = new Set<Listener>();
 let state: OverlayStoreState = initialState;
+
+function isSupportedDetailItemType(itemType: string | null): boolean {
+  return itemType === 'Movie' || itemType === 'Episode';
+}
 
 function notify(): void {
   listeners.forEach(listener => listener());
@@ -157,6 +161,18 @@ export async function refreshCurrentPageState(forceReload: boolean): Promise<voi
 
   patchOverlayState({ lastLocation: locationSignature });
   try {
+    if (isDetailsRoute) {
+      const itemType = await readItemType(itemId).catch(() => null);
+      if (itemType && !isSupportedDetailItemType(itemType)) {
+        replaceOverlayState({
+          ...initialState,
+          lastLocation: locationSignature,
+          subtitleWriteMode: state.subtitleWriteMode
+        });
+        return;
+      }
+    }
+
     await fetchParts(itemId, forceReload);
     const shouldClearLoadError = state.statusTone === 'error' && state.statusTitle === '读取媒体失败';
     patchOverlayState(shouldClearLoadError

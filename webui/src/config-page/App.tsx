@@ -188,8 +188,8 @@ export function ConfigPageApp(): JSX.Element {
                   onChange={event => setConfiguration(current => ({ ...current, EnableAutoVideoConvertToMkv: event.target.checked }))}
                 />
                 <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium text-gray-200">自动优化播放兼容性</span>
-                  <span className="text-xs text-gray-500">在需要时先处理容易导致播放异常的格式问题。</span>
+                  <span className="text-sm font-medium text-gray-200">新视频入库时自动预处理</span>
+                  <span className="text-xs text-gray-500">开启后，新视频进入媒体库时会自动计算 CID/GCID；如果需要，还会转为 MKV 或修复播放兼容性。关闭后，只在你手动处理字幕时才会执行这些步骤。</span>
                 </div>
               </label>
             </div>

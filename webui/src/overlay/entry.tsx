@@ -32,6 +32,7 @@ import {
   setSubtitleWriteMode,
   subscribe
 } from './store';
+import { openOverlayWithConfiguredWriteMode, syncOverlayWriteModeFromConfiguration } from './write-mode';
 
 function ensureRoot(id: string): HTMLElement {
   const existing = document.getElementById(id);
@@ -43,10 +44,6 @@ function ensureRoot(id: string): HTMLElement {
   element.id = id;
   document.body.appendChild(element);
   return element;
-}
-
-function normalizeWriteMode(value: string | undefined): SubtitleWriteMode {
-  return value === 'sidecar' ? 'sidecar' : 'embedded';
 }
 
 function getWriteModeMessages(mode: SubtitleWriteMode): { busyMessage: string; successMessage: string; successTitle: string } {
@@ -70,17 +67,11 @@ if (!window.__subtitlesToolsGlobalLoaded) {
 
   const floatingRoot = createRoot(ensureRoot(OVERLAY_IDS.floatingRoot));
   const overlayRoot = createRoot(ensureRoot(OVERLAY_IDS.overlayRoot));
-  let hasLoadedDefaultWriteMode = false;
+  const loadPluginConfiguration = () => readPluginConfiguration(PLUGIN_UNIQUE_ID);
 
   async function syncDefaultWriteMode(): Promise<void> {
-    if (hasLoadedDefaultWriteMode) {
-      return;
-    }
-
-    hasLoadedDefaultWriteMode = true;
     try {
-      const configuration = await readPluginConfiguration(PLUGIN_UNIQUE_ID);
-      setSubtitleWriteMode(normalizeWriteMode(configuration.DefaultSubtitleWriteMode));
+      await syncOverlayWriteModeFromConfiguration(loadPluginConfiguration, setSubtitleWriteMode);
     } catch {
       // 读取配置失败时保留默认模式，不阻塞详情页入口。
     }
@@ -231,7 +222,14 @@ if (!window.__subtitlesToolsGlobalLoaded) {
 
   function render(): void {
     const snapshot = getOverlayState();
-    floatingRoot.render(<FloatingButton onOpen={openOverlay} visible={snapshot.isFabVisible} />);
+    floatingRoot.render(
+      <FloatingButton
+        onOpen={() => {
+          void openOverlayWithConfiguredWriteMode(loadPluginConfiguration, setSubtitleWriteMode, openOverlay);
+        }}
+        visible={snapshot.isFabVisible}
+      />
+    );
     overlayRoot.render(
       <OverlayApp
         actions={{
