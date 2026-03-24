@@ -34,6 +34,7 @@ import {
   setSubtitleWriteMode,
   subscribe
 } from './store';
+import { shouldCloseOverlayOnEscape } from './keyboard';
 import { openOverlayWithConfiguredWriteMode, syncOverlayWriteModeFromConfiguration } from './write-mode';
 
 function ensureRoot(id: string): HTMLElement {
@@ -175,11 +176,6 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       throw new Error('当前没有选中的有效文件。');
     }
 
-    const confirmed = window.confirm(`确认删除字幕轨道 #${streamIndex} 吗？`);
-    if (!confirmed) {
-      return;
-    }
-
     setStatus('正在删除字幕', '请稍候。', 'busy');
     await deletePartEmbeddedSubtitle(snapshot.itemId, activePart, streamIndex);
     applyDeleteResultToPart(activePart.Id, streamIndex);
@@ -195,12 +191,6 @@ if (!window.__subtitlesToolsGlobalLoaded) {
     const activePart = getActivePart(snapshot);
     if (!snapshot.itemId || !activePart) {
       throw new Error('当前没有选中的有效文件。');
-    }
-
-    const trackName = activePart.ExternalSubtitles?.find(track => track.FilePath === filePath)?.FileName ?? '该外挂字幕';
-    const confirmed = window.confirm(`确认删除 ${trackName} 吗？`);
-    if (!confirmed) {
-      return;
     }
 
     setStatus('正在删除字幕', '请稍候。', 'busy');
@@ -326,7 +316,7 @@ if (!window.__subtitlesToolsGlobalLoaded) {
     void refreshCurrentPageState(true);
   });
   window.addEventListener('keydown', event => {
-    if (event.key === 'Escape') {
+    if (shouldCloseOverlayOnEscape(event)) {
       closeOverlay();
     }
   });

@@ -116,7 +116,7 @@ export function ConfigPageApp(): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-[#121212] text-gray-200">
+    <div className="min-h-screen bg-[var(--color-shell-bg)] text-gray-200">
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
         <header className="mb-8 sm:mb-10">
           <h1 className="text-2xl font-semibold text-gray-100 sm:text-3xl">字幕工具设置</h1>

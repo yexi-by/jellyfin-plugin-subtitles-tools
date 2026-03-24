@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, JSX, ReactNode } from 'react';
 import type { BatchMetric, ConnectionMetric, SubtitleWriteMode, UiTone } from '../shared/types';
+import { Spinner } from './loading';
 
 type ButtonVariant = 'danger' | 'primary' | 'secondary' | 'tertiary';
 type ButtonSize = 'md' | 'sm';
@@ -13,8 +14,15 @@ export function Button({
   className,
   size = 'md',
   variant = 'secondary',
+  loading = false,
+  disabled,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { size?: ButtonSize; variant?: ButtonVariant }): JSX.Element {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  size?: ButtonSize;
+  variant?: ButtonVariant;
+  /** 加载状态，显示 spinner 并禁用按钮 */
+  loading?: boolean;
+}): JSX.Element {
   const variants: Record<ButtonVariant, string> = {
     danger: 'border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20',
     primary: 'border border-transparent bg-blue-600 text-white hover:bg-blue-500',
@@ -26,16 +34,21 @@ export function Button({
     sm: 'min-h-11 px-3 py-2 text-sm'
   };
 
+  const isLoading = loading;
+  const isDisabled = disabled || loading;
+
   return (
     <button
       {...props}
+      disabled={isDisabled}
       className={cx(
-        'inline-flex min-w-0 items-center justify-center rounded-lg font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex min-w-0 items-center justify-center gap-2 rounded-lg font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50',
         sizes[size],
         variants[variant],
         className
       )}
     >
+      {isLoading ? <Spinner size="sm" /> : null}
       {children}
     </button>
   );
@@ -68,7 +81,7 @@ export function Panel({
   className
 }: HTMLAttributes<HTMLElement>): JSX.Element {
   return (
-    <section className={cx('flex flex-col gap-4 rounded-xl border border-white/10 bg-[#1e1e1e] p-5 shadow-sm', className)}>
+    <section className={cx('flex flex-col gap-4 rounded-xl border border-white/10 bg-[var(--color-shell-bg-soft)] p-5 shadow-sm', className)}>
       {children}
     </section>
   );
@@ -225,3 +238,15 @@ export function WriteModeSwitch({
 }
 
 export { cx };
+
+// 重新导出其他设计系统模块
+export { Spinner, Skeleton, SkeletonGroup } from './loading';
+export { Tooltip, InfoTooltip, ConfirmDialog } from './overlay';
+export {
+  IconClose,
+  IconLoader,
+  IconCheck,
+  IconAlertCircle,
+  IconInfo,
+  IconTrash
+} from './icons';

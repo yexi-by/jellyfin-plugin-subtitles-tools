@@ -1,8 +1,11 @@
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 import {
   Badge,
   Button,
+  ConfirmDialog,
   EmptyState,
+  IconClose,
+  IconTrash,
   MetricCard,
   SectionHeading,
   StatusBanner,
@@ -125,13 +128,24 @@ function SubtitleTrackRow({
         <span className="mt-1 block text-xs text-gray-500">{meta}</span>
       </div>
       {action && actionLabel ? (
-        <Button className="w-full sm:w-auto" type="button" variant="tertiary" onClick={action}>
+        <Button className="w-full sm:w-auto" type="button" variant="danger" onClick={action}>
+          <IconTrash size={16} />
           {actionLabel}
         </Button>
       ) : null}
     </div>
   );
 }
+
+type DeleteConfirmState = {
+  type: 'embedded';
+  streamIndex: number;
+  title: string;
+} | {
+  type: 'external';
+  filePath: string;
+  title: string;
+} | null;
 
 function SubtitleList({
   embedded,
@@ -144,43 +158,83 @@ function SubtitleList({
   onDeleteEmbedded: (streamIndex: number) => Promise<void>;
   onDeleteExternal: (filePath: string) => Promise<void>;
 }): JSX.Element {
+  const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const embeddedTracks = embedded ?? [];
   const externalTracks = external ?? [];
   const hasSubtitles = embeddedTracks.length > 0 || externalTracks.length > 0;
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirm) return;
+
+    setIsDeleting(true);
+    try {
+      if (deleteConfirm.type === 'embedded') {
+        await onDeleteEmbedded(deleteConfirm.streamIndex);
+      } else {
+        await onDeleteExternal(deleteConfirm.filePath);
+      }
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirm(null);
+    }
+  };
 
   if (!hasSubtitles) {
     return <EmptyState title="当前文件还没有字幕" description="先搜索字幕，再选择保存方式。" />;
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {embeddedTracks.map(track => (
-        <SubtitleTrackRow
-          key={`embedded-${track.StreamIndex}`}
-          action={track.IsPluginManaged ? () => void onDeleteEmbedded(track.StreamIndex) : undefined}
-          actionLabel={track.IsPluginManaged ? '删除' : undefined}
-          badges={[
-            <Badge key="kind" tone="neutral">视频内字幕</Badge>,
-            ...(track.IsPluginManaged ? [<Badge key="managed" tone="success">由本工具添加</Badge>] : [])
-          ]}
-          meta={`语言：${track.Language || '未知'} · 格式：${(track.Format || 'srt').toUpperCase()}`}
-          title={track.Title || `字幕轨道 #${track.StreamIndex}`}
-        />
-      ))}
-      {externalTracks.map(track => {
-        const filePath = track.FilePath;
-        return (
+    <>
+      <div className="flex flex-col gap-3">
+        {embeddedTracks.map(track => (
           <SubtitleTrackRow
-            key={`external-${filePath || track.FileName}`}
-            action={filePath ? () => void onDeleteExternal(filePath) : undefined}
-            actionLabel={filePath ? '删除' : undefined}
-            badges={[<Badge key="kind" tone="neutral">外挂字幕</Badge>]}
+            key={`embedded-${track.StreamIndex}`}
+            action={track.IsPluginManaged ? () => setDeleteConfirm({
+              type: 'embedded',
+              streamIndex: track.StreamIndex,
+              title: track.Title || `字幕轨道 #${track.StreamIndex}`
+            }) : undefined}
+            actionLabel={track.IsPluginManaged ? '删除' : undefined}
+            badges={[
+              <Badge key="kind" tone="neutral">视频内字幕</Badge>,
+              ...(track.IsPluginManaged ? [<Badge key="managed" tone="success">由本工具添加</Badge>] : [])
+            ]}
             meta={`语言：${track.Language || '未知'} · 格式：${(track.Format || 'srt').toUpperCase()}`}
-            title={track.FileName || '外挂字幕'}
+            title={track.Title || `字幕轨道 #${track.StreamIndex}`}
           />
-        );
-      })}
-    </div>
+        ))}
+        {externalTracks.map(track => {
+          const filePath = track.FilePath;
+          return (
+            <SubtitleTrackRow
+              key={`external-${filePath || track.FileName}`}
+              action={filePath ? () => setDeleteConfirm({
+                type: 'external',
+                filePath,
+                title: track.FileName || '外挂字幕'
+              }) : undefined}
+              actionLabel={filePath ? '删除' : undefined}
+              badges={[<Badge key="kind" tone="neutral">外挂字幕</Badge>]}
+              meta={`语言：${track.Language || '未知'} · 格式：${(track.Format || 'srt').toUpperCase()}`}
+              title={track.FileName || '外挂字幕'}
+            />
+          );
+        })}
+      </div>
+
+      <ConfirmDialog
+        open={deleteConfirm !== null}
+        title="删除字幕"
+        message={`确定要删除「${deleteConfirm?.title || ''}」吗？此操作不可撤销。`}
+        confirmText="删除"
+        tone="danger"
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirm(null)}
+      />
+    </>
   );
 }
 
@@ -323,7 +377,7 @@ export function OverlayApp({
         }
       }}
     >
-      <div className="flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121212] shadow-2xl sm:h-[min(100dvh-2rem,56rem)] sm:max-h-[min(100dvh-2rem,56rem)]">
+      <div className="flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--color-shell-bg)] shadow-2xl sm:h-[min(100dvh-2rem,56rem)] sm:max-h-[min(100dvh-2rem,56rem)]">
         <header className="flex flex-shrink-0 items-start justify-between gap-3 border-b border-white/5 p-4 sm:p-5">
           <div className="min-w-0 flex-1">
             <h2 className="text-xl font-semibold text-gray-100">{state.itemData?.Name || '字幕处理'}</h2>
@@ -339,7 +393,7 @@ export function OverlayApp({
             type="button"
             onClick={actions.closeOverlay}
           >
-            ×
+            <IconClose size={20} />
           </button>
         </header>
 
@@ -395,7 +449,7 @@ export function OverlayApp({
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           {isMultipart ? (
-            <aside className="hidden overflow-y-auto border-r border-white/5 bg-[#181818] p-4 lg:block lg:w-[18rem] lg:shrink-0">
+            <aside className="hidden overflow-y-auto border-r border-white/5 bg-[var(--color-shell-bg)] p-4 lg:block lg:w-[18rem] lg:shrink-0">
               <PartNavigation activePartId={state.activePartId} onSelect={actions.selectPart} parts={state.itemData?.Parts ?? []} />
             </aside>
           ) : null}

@@ -148,6 +148,11 @@ describe('OverlayApp', () => {
     const externalRow = screen.getByText('movie-part-1.zho.srt').closest('div.rounded-lg');
     expect(externalRow).not.toBeNull();
     fireEvent.click(within(externalRow as HTMLElement).getByRole('button', { name: '删除' }));
+
+    // 删除操作现在需要确认对话框
+    const confirmDialog = screen.getByRole('dialog');
+    expect(confirmDialog).toBeInTheDocument();
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '删除' }));
     expect(actions.deleteExternalSubtitle).toHaveBeenCalledWith('/media/movie-part-1.zho.srt');
 
     fireEvent.click(screen.getAllByRole('button', { name: /Part 2/ })[0]);
@@ -155,5 +160,34 @@ describe('OverlayApp', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     expect(actions.closeOverlay).toHaveBeenCalled();
+  });
+
+  it('在确认框打开时按下 Escape 只关闭确认框，不触发删除和关闭 overlay', () => {
+    const actions = {
+      closeOverlay: vi.fn(),
+      convertCurrentPart: vi.fn(async () => undefined),
+      convertGroup: vi.fn(async () => undefined),
+      deleteEmbeddedSubtitle: vi.fn(async () => undefined),
+      deleteExternalSubtitle: vi.fn(async () => undefined),
+      downloadBest: vi.fn(async () => undefined),
+      downloadCandidate: vi.fn(async () => undefined),
+      refresh: vi.fn(async () => undefined),
+      searchCurrentPart: vi.fn(async () => undefined),
+      selectPart: vi.fn(),
+      setSubtitleWriteMode: vi.fn()
+    };
+
+    render(<OverlayApp actions={actions} state={buildState()} />);
+
+    const externalRow = screen.getByText('movie-part-1.zho.srt').closest('div.rounded-lg');
+    expect(externalRow).not.toBeNull();
+    fireEvent.click(within(externalRow as HTMLElement).getByRole('button', { name: '删除' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(actions.deleteExternalSubtitle).not.toHaveBeenCalled();
+    expect(actions.closeOverlay).not.toHaveBeenCalled();
   });
 });

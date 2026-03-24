@@ -12,3 +12,5 @@ webui/dist/
 webui/dist-debug/
 webui/coverage/
 webui/.vitest/
+.claude
+webui/UI_UPGRADE_REPORT.md
