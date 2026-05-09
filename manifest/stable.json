@@ -14,8 +14,8 @@
         "changelog": "新增自动预处理路径黑名单：配置页支持按目录维护黑名单，新视频入库命中黑名单时跳过自动预处理；补充路径规范化、边界匹配和配置页测试覆盖。",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/yexi-by/jellyfin-plugin-subtitles-tools/releases/download/v0.7.2.8/Jellyfin.Plugin.SubtitlesTools_0.7.2.8.zip",
-        "checksum": "FF195C176CBB1717A7037BB9B285E5A3",
-        "timestamp": "2026-05-09T14:14:34Z"
+        "checksum": "175D9712FDCAEE4BBEBD2687805BC006",
+        "timestamp": "2026-05-09T14:45:19Z"
       }
     ]
   }
