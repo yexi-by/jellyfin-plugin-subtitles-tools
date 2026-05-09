@@ -103,6 +103,7 @@ public sealed class PluginConfigurationTests
         Assert.Equal(1, configuration.VideoConvertConcurrency);
         Assert.Equal(string.Empty, configuration.FfmpegExecutablePath);
         Assert.Equal("/dev/dri/renderD128", configuration.QsvRenderDevicePath);
+        Assert.Empty(configuration.AutoPreprocessPathBlacklist);
     }
 
     /// <summary>
@@ -118,6 +119,57 @@ public sealed class PluginConfigurationTests
     public void NormalizeSubtitleWriteMode_ShouldClampToKnownValues(string? input, string expected)
     {
         var value = PluginConfiguration.NormalizeSubtitleWriteMode(input);
+
+        Assert.Equal(expected, value);
+    }
+
+    /// <summary>
+    /// 自动预处理路径黑名单应去除空白项、尾部分隔符和重复目录。
+    /// </summary>
+    [Fact]
+    public void NormalizeAutoPreprocessPathBlacklist_ShouldTrimAndDeduplicatePaths()
+    {
+        var value = PluginConfiguration.NormalizeAutoPreprocessPathBlacklist(
+            [
+                "  /media/archive/  ",
+                "",
+                " /media/archive ",
+                " C:\\Media\\Skip\\ "
+            ]);
+
+        Assert.Equal(["/media/archive", "C:\\Media\\Skip"], value);
+    }
+
+    /// <summary>
+    /// 媒体文件位于黑名单目录自身或子目录时，应判定为命中。
+    /// </summary>
+    [Theory]
+    [InlineData("/media/archive/movie.mkv", true)]
+    [InlineData("/media/archive/nested/movie.mkv", true)]
+    [InlineData("/media/archive", true)]
+    [InlineData("/media/archive-other/movie.mkv", false)]
+    [InlineData("/media/other/movie.mkv", false)]
+    public void IsAutoPreprocessPathBlacklisted_ShouldMatchDirectoryBoundary(string mediaPath, bool expected)
+    {
+        var value = PluginConfiguration.IsAutoPreprocessPathBlacklisted(
+            mediaPath,
+            ["/media/archive"]);
+
+        Assert.Equal(expected, value);
+    }
+
+    /// <summary>
+    /// 路径匹配应兼容 Windows 与通用斜杠写法。
+    /// </summary>
+    [Theory]
+    [InlineData("C:\\Media\\Skip\\Movie.mkv", true)]
+    [InlineData("C:/Media/Skip/Nested/Movie.mkv", true)]
+    [InlineData("C:\\Media\\SkipSibling\\Movie.mkv", false)]
+    public void IsAutoPreprocessPathBlacklisted_ShouldNormalizeSeparators(string mediaPath, bool expected)
+    {
+        var value = PluginConfiguration.IsAutoPreprocessPathBlacklisted(
+            mediaPath,
+            ["C:/Media/Skip"]);
 
         Assert.Equal(expected, value);
     }

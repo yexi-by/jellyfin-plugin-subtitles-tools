@@ -29,6 +29,7 @@ import {
 import type { ConnectionHealthPayload, ConnectionStatusViewModel, PluginConfiguration, SubtitleWriteMode } from '../shared/types';
 
 const defaultConfiguration: PluginConfiguration = {
+  AutoPreprocessPathBlacklist: [],
   DefaultSubtitleWriteMode: 'embedded',
   EnableAutoVideoConvertToMkv: true,
   FfmpegExecutablePath: '',
@@ -46,8 +47,59 @@ function normalizeWriteMode(value: string | undefined): SubtitleWriteMode {
   return value === 'sidecar' ? 'sidecar' : 'embedded';
 }
 
+function normalizeBlacklistPaths(paths: string[] | undefined): string[] {
+  if (!Array.isArray(paths)) {
+    return [];
+  }
+
+  const seenPaths = new Set<string>();
+  const normalizedPaths: string[] = [];
+  for (const path of paths) {
+    const normalizedPath = stripTrailingPathSeparators(path.trim());
+    if (!normalizedPath) {
+      continue;
+    }
+
+    const comparisonPath = stripTrailingPathSeparators(normalizedPath.replaceAll('\\', '/')).toLowerCase();
+    if (seenPaths.has(comparisonPath)) {
+      continue;
+    }
+
+    seenPaths.add(comparisonPath);
+    normalizedPaths.push(normalizedPath);
+  }
+
+  return normalizedPaths;
+}
+
+function stripTrailingPathSeparators(value: string): string {
+  let normalizedValue = value;
+  while (shouldStripTrailingPathSeparator(normalizedValue)) {
+    normalizedValue = normalizedValue.slice(0, -1);
+  }
+
+  return normalizedValue;
+}
+
+function shouldStripTrailingPathSeparator(value: string): boolean {
+  if (value.length <= 1) {
+    return false;
+  }
+
+  if (!value.endsWith('/') && !value.endsWith('\\')) {
+    return false;
+  }
+
+  return !/^[A-Za-z]:[\\/]$/u.test(value);
+}
+
+function parseBlacklistTextarea(value: string): string[] {
+  return normalizeBlacklistPaths(value.split(/\r?\n/u));
+}
+
 export function ConfigPageApp(): JSX.Element {
   const [configuration, setConfiguration] = useState<PluginConfiguration>(defaultConfiguration);
+  const [blacklistText, setBlacklistText] = useState('');
   const [busy, setBusy] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusViewModel>(buildIdleConnectionStatus());
 
@@ -56,8 +108,10 @@ export function ConfigPageApp(): JSX.Element {
 
     try {
       const response = await readPluginConfiguration(PLUGIN_UNIQUE_ID);
+      const autoPreprocessPathBlacklist = normalizeBlacklistPaths(response.AutoPreprocessPathBlacklist);
       startTransition(() => {
         setConfiguration({
+          AutoPreprocessPathBlacklist: autoPreprocessPathBlacklist,
           DefaultSubtitleWriteMode: normalizeWriteMode(response.DefaultSubtitleWriteMode),
           EnableAutoVideoConvertToMkv: response.EnableAutoVideoConvertToMkv !== false,
           FfmpegExecutablePath: response.FfmpegExecutablePath || '',
@@ -66,6 +120,7 @@ export function ConfigPageApp(): JSX.Element {
           ServiceBaseUrl: response.ServiceBaseUrl || 'http://127.0.0.1:8055',
           VideoConvertConcurrency: response.VideoConvertConcurrency || 1
         });
+        setBlacklistText(autoPreprocessPathBlacklist.join('\n'));
         setConnectionStatus(buildIdleConnectionStatus());
       });
     } catch {
@@ -85,7 +140,7 @@ export function ConfigPageApp(): JSX.Element {
     showLoading();
 
     try {
-      const response = await requestJson<ConnectionHealthPayload>(`${API_ROOT}/TestConnection`, 'POST', configuration);
+      const response = await requestJson<ConnectionHealthPayload>(`${API_ROOT}/TestConnection`, 'POST', buildConfigurationForSubmit());
       setConnectionStatus(buildSuccessConnectionStatus(response));
     } catch (error) {
       setConnectionStatus(buildErrorConnectionStatus());
@@ -102,17 +157,35 @@ export function ConfigPageApp(): JSX.Element {
 
     try {
       const current = await readPluginConfiguration(PLUGIN_UNIQUE_ID);
+      const normalizedConfiguration = buildConfigurationForSubmit();
       const result = await savePluginConfiguration(PLUGIN_UNIQUE_ID, {
         ...current,
-        ...configuration
+        ...normalizedConfiguration
       });
       showConfigurationSaved(result);
+      setConfiguration(normalizedConfiguration);
+      setBlacklistText(normalizedConfiguration.AutoPreprocessPathBlacklist.join('\n'));
     } catch (error) {
       showError(extractErrorMessage(error));
     } finally {
       setBusy(false);
       hideLoading();
     }
+  }
+
+  function updateBlacklistText(value: string): void {
+    setBlacklistText(value);
+    setConfiguration(current => ({
+      ...current,
+      AutoPreprocessPathBlacklist: parseBlacklistTextarea(value)
+    }));
+  }
+
+  function buildConfigurationForSubmit(): PluginConfiguration {
+    return {
+      ...configuration,
+      AutoPreprocessPathBlacklist: parseBlacklistTextarea(blacklistText)
+    };
   }
 
   return (
@@ -192,6 +265,18 @@ export function ConfigPageApp(): JSX.Element {
                   <span className="text-xs text-gray-500">开启后，新视频进入媒体库时会自动计算 CID/GCID；如果需要，还会转为 MKV 或修复播放兼容性。关闭后，只在你手动处理字幕时才会执行这些步骤。</span>
                 </div>
               </label>
+
+              <FieldShell
+                label="自动预处理路径黑名单"
+                description="每行填写一个媒体目录。新视频位于这些目录内时，会跳过入库自动预处理；手动纳管和字幕操作不受影响。"
+              >
+                <textarea
+                  className={`${textInputClassName()} min-h-28 resize-y leading-6`}
+                  placeholder="每行一个媒体目录路径"
+                  value={blacklistText}
+                  onChange={event => updateBlacklistText(event.target.value)}
+                />
+              </FieldShell>
             </div>
           </Panel>
 

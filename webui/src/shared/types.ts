@@ -11,6 +11,7 @@ export type UiTone =
 export type SubtitleWriteMode = 'embedded' | 'sidecar';
 
 export interface PluginConfiguration {
+  AutoPreprocessPathBlacklist: string[];
   DefaultSubtitleWriteMode: SubtitleWriteMode;
   ServiceBaseUrl: string;
   RequestTimeoutSeconds: number;

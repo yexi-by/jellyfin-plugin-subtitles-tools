@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Jellyfin.Plugin.SubtitlesTools.Models;
 using MediaBrowser.Model.Plugins;
 
@@ -52,6 +53,7 @@ public class PluginConfiguration : BasePluginConfiguration
         DefaultSubtitleWriteMode = DefaultSubtitleWriteModeValue;
         FfmpegExecutablePath = string.Empty;
         QsvRenderDevicePath = DefaultQsvRenderDevicePath;
+        AutoPreprocessPathBlacklist = [];
     }
 
     /// <summary>
@@ -88,6 +90,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Intel QSV 渲染设备路径。
     /// </summary>
     public string QsvRenderDevicePath { get; set; }
+
+    /// <summary>
+    /// 新视频入库自动预处理的路径黑名单。
+    /// </summary>
+    public string[] AutoPreprocessPathBlacklist { get; set; }
 
     /// <summary>
     /// 规范化 Python 服务地址。
@@ -181,5 +188,159 @@ public class PluginConfiguration : BasePluginConfiguration
     public static string NormalizeQsvRenderDevicePath(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? DefaultQsvRenderDevicePath : value.Trim();
+    }
+
+    /// <summary>
+    /// 规范化自动预处理路径黑名单，去除空白项并按路径语义去重。
+    /// </summary>
+    /// <param name="values">用户配置的黑名单路径集合。</param>
+    /// <returns>可持久化的黑名单路径集合。</returns>
+    public static string[] NormalizeAutoPreprocessPathBlacklist(IEnumerable<string?>? values)
+    {
+        if (values is null)
+        {
+            return [];
+        }
+
+        var normalizedPaths = new List<string>();
+        var seenComparisonPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in values)
+        {
+            var normalizedPath = NormalizeBlacklistPath(value);
+            if (normalizedPath.Length == 0)
+            {
+                continue;
+            }
+
+            var comparisonPath = NormalizePathForComparison(normalizedPath);
+            if (seenComparisonPaths.Add(comparisonPath))
+            {
+                normalizedPaths.Add(normalizedPath);
+            }
+        }
+
+        return [.. normalizedPaths];
+    }
+
+    /// <summary>
+    /// 判断媒体路径是否命中自动预处理路径黑名单。
+    /// </summary>
+    /// <param name="mediaPath">待检查的媒体文件路径。</param>
+    /// <param name="blacklistPaths">用户配置的黑名单目录集合。</param>
+    /// <returns>命中黑名单时返回 <c>true</c>。</returns>
+    public static bool IsAutoPreprocessPathBlacklisted(string? mediaPath, IEnumerable<string?>? blacklistPaths)
+    {
+        return TryMatchAutoPreprocessBlacklistPath(mediaPath, blacklistPaths, out _);
+    }
+
+    /// <summary>
+    /// 判断媒体路径是否命中自动预处理路径黑名单，并返回命中的黑名单目录。
+    /// </summary>
+    /// <param name="mediaPath">待检查的媒体文件路径。</param>
+    /// <param name="blacklistPaths">用户配置的黑名单目录集合。</param>
+    /// <param name="matchedBlacklistPath">命中的黑名单目录。</param>
+    /// <returns>命中黑名单时返回 <c>true</c>。</returns>
+    public static bool TryMatchAutoPreprocessBlacklistPath(
+        string? mediaPath,
+        IEnumerable<string?>? blacklistPaths,
+        out string matchedBlacklistPath)
+    {
+        matchedBlacklistPath = string.Empty;
+
+        var comparisonMediaPath = NormalizePathForComparison(mediaPath);
+        if (comparisonMediaPath.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var blacklistPath in NormalizeAutoPreprocessPathBlacklist(blacklistPaths))
+        {
+            var comparisonBlacklistPath = NormalizePathForComparison(blacklistPath);
+            if (IsSamePathOrChild(comparisonMediaPath, comparisonBlacklistPath))
+            {
+                matchedBlacklistPath = blacklistPath;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string NormalizeBlacklistPath(string? value)
+    {
+        var normalizedValue = value?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedValue))
+        {
+            return string.Empty;
+        }
+
+        normalizedValue = normalizedValue.Trim('"').Trim();
+        return TrimTrailingPathSeparators(normalizedValue);
+    }
+
+    private static string NormalizePathForComparison(string? value)
+    {
+        var normalizedValue = NormalizeBlacklistPath(value);
+        return normalizedValue.Replace('\\', '/');
+    }
+
+    private static string TrimTrailingPathSeparators(string value)
+    {
+        var normalizedValue = value;
+        while (ShouldTrimTrailingPathSeparator(normalizedValue))
+        {
+            normalizedValue = normalizedValue[..^1];
+        }
+
+        return normalizedValue;
+    }
+
+    private static bool ShouldTrimTrailingPathSeparator(string value)
+    {
+        if (value.Length <= 1)
+        {
+            return false;
+        }
+
+        if (!IsPathSeparator(value[^1]))
+        {
+            return false;
+        }
+
+        return !IsWindowsDriveRoot(value);
+    }
+
+    private static bool IsSamePathOrChild(string mediaPath, string blacklistPath)
+    {
+        if (blacklistPath.Length == 0)
+        {
+            return false;
+        }
+
+        if (string.Equals(blacklistPath, "/", StringComparison.Ordinal))
+        {
+            return mediaPath.Length > 0 && mediaPath[0] == '/';
+        }
+
+        if (blacklistPath[^1] == '/')
+        {
+            return mediaPath.StartsWith(blacklistPath, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(mediaPath, blacklistPath, StringComparison.OrdinalIgnoreCase)
+            || mediaPath.StartsWith($"{blacklistPath}/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsWindowsDriveRoot(string value)
+    {
+        return value.Length == 3
+            && char.IsLetter(value[0])
+            && value[1] == ':'
+            && IsPathSeparator(value[2]);
+    }
+
+    private static bool IsPathSeparator(char value)
+    {
+        return value is '/' or '\\';
     }
 }

@@ -27,6 +27,7 @@ describe('ConfigPageApp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     readPluginConfiguration.mockResolvedValue({
+      AutoPreprocessPathBlacklist: ['/media/archive', '/media/private'],
       DefaultSubtitleWriteMode: 'embedded',
       EnableAutoVideoConvertToMkv: false,
       FfmpegExecutablePath: '/usr/bin/ffmpeg',
@@ -57,6 +58,7 @@ describe('ConfigPageApp', () => {
 
     expect(await screen.findByDisplayValue('http://service.test:8055')).toBeInTheDocument();
     expect(screen.getByDisplayValue('20')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('每行一个媒体目录路径')).toHaveValue('/media/archive\n/media/private');
 
     fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
 
@@ -67,6 +69,7 @@ describe('ConfigPageApp', () => {
       'Jellyfin.Plugin.SubtitlesTools/TestConnection',
       'POST',
       expect.objectContaining({
+        AutoPreprocessPathBlacklist: ['/media/archive', '/media/private'],
         RequestTimeoutSeconds: 20,
         ServiceBaseUrl: 'http://service.test:8055'
       })
@@ -82,12 +85,16 @@ describe('ConfigPageApp', () => {
     fireEvent.change(serviceInput, {
       target: { value: 'http://localhost:9000' }
     });
+    fireEvent.change(screen.getByPlaceholderText('每行一个媒体目录路径'), {
+      target: { value: '/media/archive/\n\n/media/new-skip' }
+    });
     fireEvent.click(screen.getByRole('button', { name: '保存设置' }));
 
     await waitFor(() => {
       expect(savePluginConfiguration).toHaveBeenCalledWith(
         PLUGIN_UNIQUE_ID,
         expect.objectContaining({
+          AutoPreprocessPathBlacklist: ['/media/archive', '/media/new-skip'],
           ServiceBaseUrl: 'http://localhost:9000'
         })
       );

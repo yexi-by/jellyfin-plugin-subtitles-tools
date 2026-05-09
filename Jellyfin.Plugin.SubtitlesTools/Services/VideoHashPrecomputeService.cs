@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.SubtitlesTools.Configuration;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.IO;
@@ -100,6 +101,15 @@ public sealed class VideoHashPrecomputeService : BackgroundService
             return;
         }
 
+        if (TryMatchAutoPreprocessBlacklistPath(mediaPath, out var blacklistPath))
+        {
+            _logger.LogInformation(
+                "auto_manage_skip_blacklisted media_path={MediaPath} blacklist_path={BlacklistPath}",
+                mediaPath,
+                blacklistPath);
+            return;
+        }
+
         if (_scheduledMediaPaths.TryAdd(mediaPath, 0))
         {
             _queue.Writer.TryWrite(new ManageWorkItem(eventArgs.Item.Id, mediaPath, CreateTraceId()));
@@ -117,6 +127,16 @@ public sealed class VideoHashPrecomputeService : BackgroundService
                     "trace={TraceId} auto_manage_skip_disabled media_path={MediaPath}",
                     workItem.TraceId,
                     workItem.MediaPath);
+                return;
+            }
+
+            if (TryMatchAutoPreprocessBlacklistPath(workItem.MediaPath, out var blacklistPath))
+            {
+                _logger.LogInformation(
+                    "trace={TraceId} auto_manage_skip_blacklisted media_path={MediaPath} blacklist_path={BlacklistPath}",
+                    workItem.TraceId,
+                    workItem.MediaPath,
+                    blacklistPath);
                 return;
             }
 
@@ -169,8 +189,17 @@ public sealed class VideoHashPrecomputeService : BackgroundService
 
     private static bool ShouldHandleNewItem()
     {
-        var configuration = Plugin.Instance?.Configuration ?? new Configuration.PluginConfiguration();
+        var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
         return configuration.EnableAutoVideoConvertToMkv;
+    }
+
+    private static bool TryMatchAutoPreprocessBlacklistPath(string mediaPath, out string blacklistPath)
+    {
+        var configuration = Plugin.Instance?.Configuration ?? new PluginConfiguration();
+        return PluginConfiguration.TryMatchAutoPreprocessBlacklistPath(
+            mediaPath,
+            configuration.AutoPreprocessPathBlacklist,
+            out blacklistPath);
     }
 
     private static string CreateTraceId()
