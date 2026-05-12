@@ -2,7 +2,7 @@
   {
     "guid": "b812b763-a31d-4d19-bfcc-15b9eac432cb",
     "name": "Subtitles Tools",
-    "description": "通过 subtitles-tools Python 服务为 Jellyfin 提供视频自动纳管至 MKV、MKV 元数据 CID/GCID、字幕转 SRT 以及 MKV 软字幕内封能力。",
+    "description": "为 Jellyfin 内置迅雷字幕搜索、字幕下载缓存、视频自动纳管至 MKV、MKV 元数据 CID/GCID、字幕转 SRT 以及 MKV 软字幕内封能力。",
     "overview": "插件只处理本地 Movie 和 Episode 文件。它会把视频统一纳管到 MKV，在 MKV 元数据中保存插件使用的 CID/GCID，并在详情页提供内封字幕管理入口，支持逐段或整组转换为 MKV、搜索迅雷字幕、下载后自动转临时 SRT 并写入 MKV，最终不再依赖外挂字幕文件。",
     "owner": "yexi-by",
     "category": "Metadata",

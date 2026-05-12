@@ -33,12 +33,14 @@ describe('ConfigPageApp', () => {
       FfmpegExecutablePath: '/usr/bin/ffmpeg',
       QsvRenderDevicePath: '/dev/dri/renderD129',
       RequestTimeoutSeconds: 20,
-      ServiceBaseUrl: 'http://service.test:8055',
+      SearchCacheTtlSeconds: 3600,
+      SubtitleCacheTtlSeconds: 7200,
+      ThunderBaseUrl: 'https://subtitle-source.test',
       VideoConvertConcurrency: 2
     });
   });
 
-  it('加载配置后显示表单，并在连接检测成功后渲染结构化状态', async () => {
+  it('加载配置后显示表单，并在字幕源检测成功后渲染结构化状态', async () => {
     requestJson.mockResolvedValue({
       Ffmpeg: {
         ffmpegPath: '/usr/bin/ffmpeg',
@@ -46,6 +48,9 @@ describe('ConfigPageApp', () => {
       },
       Health: {
         ProviderName: 'ZiMuKu',
+        ProviderBaseUrl: 'https://subtitle-source.test',
+        SearchCacheTtlSeconds: 3600,
+        SubtitleCacheTtlSeconds: 7200,
         Version: '1.2.3'
       },
       Video: {
@@ -56,22 +61,28 @@ describe('ConfigPageApp', () => {
 
     render(<ConfigPageApp />);
 
-    expect(await screen.findByDisplayValue('http://service.test:8055')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('https://subtitle-source.test')).toBeInTheDocument();
     expect(screen.getByDisplayValue('20')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('3600')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('7200')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('每行一个媒体目录路径')).toHaveValue('/media/archive\n/media/private');
 
-    fireEvent.click(screen.getByRole('button', { name: '测试连接' }));
+    fireEvent.click(screen.getByRole('button', { name: '检测字幕源' }));
 
-    expect(await screen.findByText('连接正常')).toBeInTheDocument();
-    expect(screen.getByText('服务版本')).toBeInTheDocument();
+    expect(await screen.findByText('字幕源正常')).toBeInTheDocument();
+    expect(screen.getByText('插件版本')).toBeInTheDocument();
     expect(screen.getByText('ZiMuKu')).toBeInTheDocument();
+    expect(screen.getByText('https://subtitle-source.test')).toBeInTheDocument();
+    expect(screen.getByText('3600 秒')).toBeInTheDocument();
     expect(requestJson).toHaveBeenCalledWith(
       'Jellyfin.Plugin.SubtitlesTools/TestConnection',
       'POST',
       expect.objectContaining({
         AutoPreprocessPathBlacklist: ['/media/archive', '/media/private'],
         RequestTimeoutSeconds: 20,
-        ServiceBaseUrl: 'http://service.test:8055'
+        SearchCacheTtlSeconds: 3600,
+        SubtitleCacheTtlSeconds: 7200,
+        ThunderBaseUrl: 'https://subtitle-source.test'
       })
     );
   });
@@ -81,9 +92,12 @@ describe('ConfigPageApp', () => {
 
     render(<ConfigPageApp />);
 
-    const serviceInput = await screen.findByDisplayValue('http://service.test:8055');
-    fireEvent.change(serviceInput, {
-      target: { value: 'http://localhost:9000' }
+    const thunderInput = await screen.findByDisplayValue('https://subtitle-source.test');
+    fireEvent.change(thunderInput, {
+      target: { value: 'https://subtitle-source.local' }
+    });
+    fireEvent.change(screen.getByDisplayValue('3600'), {
+      target: { value: '1800' }
     });
     fireEvent.change(screen.getByPlaceholderText('每行一个媒体目录路径'), {
       target: { value: '/media/archive/\n\n/media/new-skip' }
@@ -95,7 +109,8 @@ describe('ConfigPageApp', () => {
         PLUGIN_UNIQUE_ID,
         expect.objectContaining({
           AutoPreprocessPathBlacklist: ['/media/archive', '/media/new-skip'],
-          ServiceBaseUrl: 'http://localhost:9000'
+          SearchCacheTtlSeconds: 1800,
+          ThunderBaseUrl: 'https://subtitle-source.local'
         })
       );
     });

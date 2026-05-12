@@ -13,8 +13,10 @@ export type SubtitleWriteMode = 'embedded' | 'sidecar';
 export interface PluginConfiguration {
   AutoPreprocessPathBlacklist: string[];
   DefaultSubtitleWriteMode: SubtitleWriteMode;
-  ServiceBaseUrl: string;
+  ThunderBaseUrl: string;
   RequestTimeoutSeconds: number;
+  SearchCacheTtlSeconds: number;
+  SubtitleCacheTtlSeconds: number;
   EnableAutoVideoConvertToMkv: boolean;
   VideoConvertConcurrency: number;
   FfmpegExecutablePath: string;
@@ -25,6 +27,9 @@ export interface ConnectionHealthPayload {
   Health?: {
     Version?: string;
     ProviderName?: string;
+    ProviderBaseUrl?: string;
+    SearchCacheTtlSeconds?: number;
+    SubtitleCacheTtlSeconds?: number;
   };
   Ffmpeg?: {
     ffmpegPath?: string;

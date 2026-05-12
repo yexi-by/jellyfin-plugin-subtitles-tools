@@ -35,7 +35,9 @@ const defaultConfiguration: PluginConfiguration = {
   FfmpegExecutablePath: '',
   QsvRenderDevicePath: '/dev/dri/renderD128',
   RequestTimeoutSeconds: 10,
-  ServiceBaseUrl: 'http://127.0.0.1:8055',
+  SearchCacheTtlSeconds: 86400,
+  SubtitleCacheTtlSeconds: 604800,
+  ThunderBaseUrl: 'https://api-shoulei-ssl.xunlei.com',
   VideoConvertConcurrency: 1
 };
 
@@ -117,7 +119,9 @@ export function ConfigPageApp(): JSX.Element {
           FfmpegExecutablePath: response.FfmpegExecutablePath || '',
           QsvRenderDevicePath: response.QsvRenderDevicePath || '/dev/dri/renderD128',
           RequestTimeoutSeconds: response.RequestTimeoutSeconds || 10,
-          ServiceBaseUrl: response.ServiceBaseUrl || 'http://127.0.0.1:8055',
+          SearchCacheTtlSeconds: response.SearchCacheTtlSeconds || 86400,
+          SubtitleCacheTtlSeconds: response.SubtitleCacheTtlSeconds || 604800,
+          ThunderBaseUrl: response.ThunderBaseUrl || 'https://api-shoulei-ssl.xunlei.com',
           VideoConvertConcurrency: response.VideoConvertConcurrency || 1
         });
         setBlacklistText(autoPreprocessPathBlacklist.join('\n'));
@@ -193,48 +197,26 @@ export function ConfigPageApp(): JSX.Element {
       <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-10">
         <header className="mb-8 sm:mb-10">
           <h1 className="text-2xl font-semibold text-gray-100 sm:text-3xl">字幕工具设置</h1>
-          <p className="mt-2 text-sm text-gray-400">连接字幕服务，设置默认保存方式。</p>
+          <p className="mt-2 text-sm text-gray-400">检测内置字幕源，设置默认保存方式。</p>
         </header>
 
         <div className="flex flex-col gap-6">
           <Panel>
-            <SectionHeading title="服务连接" description="填写字幕服务地址，并先做一次连接检测。" />
-            <div className="grid gap-4 md:grid-cols-2">
-              <FieldShell label="服务地址" description="例如：http://127.0.0.1:8055">
-                <input
-                  className={textInputClassName()}
-                  value={configuration.ServiceBaseUrl}
-                  onChange={event => setConfiguration(current => ({ ...current, ServiceBaseUrl: event.target.value }))}
-                />
-              </FieldShell>
-              <FieldShell label="请求超时（秒）">
-                <input
-                  className={textInputClassName()}
-                  max={120}
-                  min={1}
-                  type="number"
-                  value={configuration.RequestTimeoutSeconds}
-                  onChange={event => setConfiguration(current => ({ ...current, RequestTimeoutSeconds: Number.parseInt(event.target.value, 10) || 10 }))}
-                />
-              </FieldShell>
+            <SectionHeading title="字幕源检测" description="检查内置迅雷字幕源、FFmpeg 与硬解修复环境。" />
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-sm font-medium text-gray-200">运行检测</span>
+              <Button className="w-full sm:w-auto" size="sm" disabled={busy} type="button" variant="secondary" onClick={() => void testConnection()}>
+                检测字幕源
+              </Button>
             </div>
-
-            <div className="mt-2 border-t border-white/5 pt-4">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-sm font-medium text-gray-200">连接检测</span>
-                <Button className="w-full sm:w-auto" size="sm" disabled={busy} type="button" variant="secondary" onClick={() => void testConnection()}>
-                  测试连接
-                </Button>
-              </div>
-              <StatusBanner
-                label={connectionStatus.label}
-                message={connectionStatus.message}
-                title={connectionStatus.title}
-                tone={connectionStatus.tone}
-              />
-              <div className="mt-3">
-                <ConnectionMetrics metrics={connectionStatus.details} />
-              </div>
+            <StatusBanner
+              label={connectionStatus.label}
+              message={connectionStatus.message}
+              title={connectionStatus.title}
+              tone={connectionStatus.tone}
+            />
+            <div className="mt-3">
+              <ConnectionMetrics metrics={connectionStatus.details} />
             </div>
           </Panel>
 
@@ -283,6 +265,43 @@ export function ConfigPageApp(): JSX.Element {
           <Panel>
             <SectionHeading title="高级设置" description="不确定时保持默认即可。" />
             <div className="grid gap-4 md:grid-cols-2">
+              <FieldShell label="迅雷接口地址">
+                <input
+                  className={textInputClassName()}
+                  value={configuration.ThunderBaseUrl}
+                  onChange={event => setConfiguration(current => ({ ...current, ThunderBaseUrl: event.target.value }))}
+                />
+              </FieldShell>
+              <FieldShell label="请求超时（秒）">
+                <input
+                  className={textInputClassName()}
+                  max={120}
+                  min={1}
+                  type="number"
+                  value={configuration.RequestTimeoutSeconds}
+                  onChange={event => setConfiguration(current => ({ ...current, RequestTimeoutSeconds: Number.parseInt(event.target.value, 10) || 10 }))}
+                />
+              </FieldShell>
+              <FieldShell label="搜索缓存（秒）">
+                <input
+                  className={textInputClassName()}
+                  max={604800}
+                  min={60}
+                  type="number"
+                  value={configuration.SearchCacheTtlSeconds}
+                  onChange={event => setConfiguration(current => ({ ...current, SearchCacheTtlSeconds: Number.parseInt(event.target.value, 10) || 86400 }))}
+                />
+              </FieldShell>
+              <FieldShell label="字幕缓存（秒）">
+                <input
+                  className={textInputClassName()}
+                  max={2592000}
+                  min={60}
+                  type="number"
+                  value={configuration.SubtitleCacheTtlSeconds}
+                  onChange={event => setConfiguration(current => ({ ...current, SubtitleCacheTtlSeconds: Number.parseInt(event.target.value, 10) || 604800 }))}
+                />
+              </FieldShell>
               <FieldShell label="转换并发数">
                 <input
                   className={textInputClassName()}

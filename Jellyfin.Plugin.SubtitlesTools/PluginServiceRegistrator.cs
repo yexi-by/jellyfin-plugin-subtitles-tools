@@ -32,7 +32,9 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
 
         serviceCollection.AddSingleton<VideoHashCalculator>();
         serviceCollection.AddSingleton<VideoHashBackfillService>();
-        serviceCollection.AddSingleton<SubtitlesToolsApiClient>();
+        serviceCollection.AddSingleton<SubtitleSourceCacheStore>();
+        serviceCollection.AddSingleton<ThunderSubtitleProvider>();
+        serviceCollection.AddSingleton<SubtitleSourceService>();
         serviceCollection.AddSingleton<SubtitleMetadataService>();
         serviceCollection.AddSingleton<FfmpegProcessService>();
         serviceCollection.AddSingleton<AndroidHwdecodeRiskService>();

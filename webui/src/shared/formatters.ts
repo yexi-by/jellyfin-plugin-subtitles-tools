@@ -24,6 +24,21 @@ function readValue(source: Record<string, unknown> | undefined, keys: string[], 
   return fallback;
 }
 
+function readNumberValue(source: Record<string, unknown> | undefined, keys: string[], fallback: string): string {
+  if (!source) {
+    return fallback;
+  }
+
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return `${value} 秒`;
+    }
+  }
+
+  return fallback;
+}
+
 function hasCompatibilityRisk(part: MediaPart): boolean {
   return part.NeedsCompatibilityRepair === true
     || part.RiskVerdict?.includes('高风险') === true
@@ -35,7 +50,7 @@ export function buildIdleConnectionStatus(): ConnectionStatusViewModel {
     tone: 'idle',
     label: '待检测',
     title: '尚未检测',
-    message: '建议先测试连接，再保存设置。',
+    message: '建议先检测字幕源，再保存设置。',
     details: []
   };
 }
@@ -44,8 +59,8 @@ export function buildLoadingConnectionStatus(): ConnectionStatusViewModel {
   return {
     tone: 'busy',
     label: '检测中',
-    title: '正在检测连接',
-    message: '正在检查服务地址和运行环境，请稍候。',
+    title: '正在检测字幕源',
+    message: '正在检查内置字幕源和运行环境，请稍候。',
     details: []
   };
 }
@@ -59,11 +74,14 @@ export function buildSuccessConnectionStatus(payload: ConnectionHealthPayload): 
   return {
     tone: 'success',
     label: '正常',
-    title: '连接正常',
+    title: '字幕源正常',
     message: '可以开始使用字幕搜索和保存功能。',
     details: [
-      { label: '服务版本', value: readValue(health, ['Version', 'version'], '-') },
+      { label: '插件版本', value: readValue(health, ['Version', 'version'], '-') },
       { label: '字幕源', value: readValue(health, ['ProviderName', 'providerName', 'provider_name'], '-') },
+      { label: '上游地址', value: readValue(health, ['ProviderBaseUrl', 'providerBaseUrl', 'provider_base_url'], '-') },
+      { label: '搜索缓存', value: readNumberValue(health, ['SearchCacheTtlSeconds', 'searchCacheTtlSeconds', 'search_cache_ttl_seconds'], '-') },
+      { label: '字幕缓存', value: readNumberValue(health, ['SubtitleCacheTtlSeconds', 'subtitleCacheTtlSeconds', 'subtitle_cache_ttl_seconds'], '-') },
       { label: 'FFmpeg', value: readValue(ffmpeg, ['ffmpegPath', 'FfmpegPath'], '-') },
       { label: 'FFprobe', value: readValue(ffmpeg, ['ffprobePath', 'FfprobePath'], '-') },
       { label: 'QSV 设备', value: readValue(video, ['qsvRenderDevicePath', 'QsvRenderDevicePath'], '-') },
@@ -76,8 +94,8 @@ export function buildErrorConnectionStatus(): ConnectionStatusViewModel {
   return {
     tone: 'error',
     label: '失败',
-    title: '连接失败',
-    message: '无法连接服务，请检查地址、超时或服务是否启动。',
+    title: '字幕源检测失败',
+    message: '无法完成检测，请检查上游地址、超时和 FFmpeg 配置。',
     details: []
   };
 }

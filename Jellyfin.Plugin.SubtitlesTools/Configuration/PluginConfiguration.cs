@@ -12,14 +12,24 @@ namespace Jellyfin.Plugin.SubtitlesTools.Configuration;
 public class PluginConfiguration : BasePluginConfiguration
 {
     /// <summary>
-    /// 默认 Python 服务地址。
+    /// 默认迅雷字幕接口根地址。
     /// </summary>
-    public const string DefaultServiceBaseUrl = "http://127.0.0.1:8055";
+    public const string DefaultThunderBaseUrl = "https://api-shoulei-ssl.xunlei.com";
 
     /// <summary>
-    /// 默认请求超时秒数。
+    /// 默认上游字幕源请求超时秒数。
     /// </summary>
     public const int DefaultRequestTimeoutSeconds = 10;
+
+    /// <summary>
+    /// 默认搜索缓存有效期秒数。
+    /// </summary>
+    public const int DefaultSearchCacheTtlSeconds = 24 * 60 * 60;
+
+    /// <summary>
+    /// 默认字幕元数据和字幕文件缓存有效期秒数。
+    /// </summary>
+    public const int DefaultSubtitleCacheTtlSeconds = 7 * 24 * 60 * 60;
 
     /// <summary>
     /// 默认开启“新视频入库后自动纳管并修复安卓硬解兼容”。
@@ -46,8 +56,10 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public PluginConfiguration()
     {
-        ServiceBaseUrl = DefaultServiceBaseUrl;
+        ThunderBaseUrl = DefaultThunderBaseUrl;
         RequestTimeoutSeconds = DefaultRequestTimeoutSeconds;
+        SearchCacheTtlSeconds = DefaultSearchCacheTtlSeconds;
+        SubtitleCacheTtlSeconds = DefaultSubtitleCacheTtlSeconds;
         EnableAutoVideoConvertToMkv = DefaultEnableAutoVideoConvertToMkv;
         VideoConvertConcurrency = DefaultVideoConvertConcurrency;
         DefaultSubtitleWriteMode = DefaultSubtitleWriteModeValue;
@@ -57,14 +69,24 @@ public class PluginConfiguration : BasePluginConfiguration
     }
 
     /// <summary>
-    /// Python 服务地址。
+    /// 迅雷字幕接口根地址。
     /// </summary>
-    public string ServiceBaseUrl { get; set; }
+    public string ThunderBaseUrl { get; set; }
 
     /// <summary>
-    /// 请求超时秒数。
+    /// 上游字幕源请求超时秒数。
     /// </summary>
     public int RequestTimeoutSeconds { get; set; }
+
+    /// <summary>
+    /// 搜索缓存有效期秒数。
+    /// </summary>
+    public int SearchCacheTtlSeconds { get; set; }
+
+    /// <summary>
+    /// 字幕元数据和字幕文件缓存有效期秒数。
+    /// </summary>
+    public int SubtitleCacheTtlSeconds { get; set; }
 
     /// <summary>
     /// 是否在新视频入库后自动纳管并修复安卓硬解兼容。
@@ -97,25 +119,25 @@ public class PluginConfiguration : BasePluginConfiguration
     public string[] AutoPreprocessPathBlacklist { get; set; }
 
     /// <summary>
-    /// 规范化 Python 服务地址。
+    /// 规范化迅雷字幕接口根地址。
     /// </summary>
-    public static string NormalizeServiceBaseUrl(string? value)
+    public static string NormalizeThunderBaseUrl(string? value)
     {
         var rawValue = value?.Trim();
         if (string.IsNullOrWhiteSpace(rawValue))
         {
-            return DefaultServiceBaseUrl;
+            return DefaultThunderBaseUrl;
         }
 
         if (!Uri.TryCreate(rawValue, UriKind.Absolute, out var uri))
         {
-            throw new ArgumentException("服务地址不是合法的绝对 URL。", nameof(value));
+            throw new ArgumentException("迅雷字幕接口地址不是合法的绝对 URL。", nameof(value));
         }
 
         if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException("服务地址只支持 http 或 https 协议。", nameof(value));
+            throw new ArgumentException("迅雷字幕接口地址只支持 http 或 https 协议。", nameof(value));
         }
 
         var builder = new UriBuilder(uri)
@@ -144,6 +166,26 @@ public class PluginConfiguration : BasePluginConfiguration
         }
 
         return value;
+    }
+
+    /// <summary>
+    /// 把搜索缓存有效期收敛到安全范围。
+    /// </summary>
+    /// <param name="value">原始有效期秒数。</param>
+    /// <returns>规范化后的有效期秒数。</returns>
+    public static int NormalizeSearchCacheTtlSeconds(int value)
+    {
+        return ClampSeconds(value, minimumSeconds: 60, maximumSeconds: 7 * 24 * 60 * 60);
+    }
+
+    /// <summary>
+    /// 把字幕文件缓存有效期收敛到安全范围。
+    /// </summary>
+    /// <param name="value">原始有效期秒数。</param>
+    /// <returns>规范化后的有效期秒数。</returns>
+    public static int NormalizeSubtitleCacheTtlSeconds(int value)
+    {
+        return ClampSeconds(value, minimumSeconds: 60, maximumSeconds: 30 * 24 * 60 * 60);
     }
 
     /// <summary>
@@ -342,5 +384,20 @@ public class PluginConfiguration : BasePluginConfiguration
     private static bool IsPathSeparator(char value)
     {
         return value is '/' or '\\';
+    }
+
+    private static int ClampSeconds(int value, int minimumSeconds, int maximumSeconds)
+    {
+        if (value < minimumSeconds)
+        {
+            return minimumSeconds;
+        }
+
+        if (value > maximumSeconds)
+        {
+            return maximumSeconds;
+        }
+
+        return value;
     }
 }

@@ -9,23 +9,23 @@ namespace Jellyfin.Plugin.SubtitlesTools.Tests;
 public sealed class PluginConfigurationTests
 {
     /// <summary>
-    /// 服务地址应自动去掉尾部斜杠。
+    /// 迅雷字幕接口地址应自动去掉尾部斜杠。
     /// </summary>
     [Fact]
-    public void NormalizeServiceBaseUrl_ShouldTrimTrailingSlash()
+    public void NormalizeThunderBaseUrl_ShouldTrimTrailingSlash()
     {
-        var value = PluginConfiguration.NormalizeServiceBaseUrl("http://127.0.0.1:8055/");
+        var value = PluginConfiguration.NormalizeThunderBaseUrl("https://subtitle.example/");
 
-        Assert.Equal("http://127.0.0.1:8055", value);
+        Assert.Equal("https://subtitle.example", value);
     }
 
     /// <summary>
-    /// 只允许 http 和 https 协议。
+    /// 迅雷字幕接口地址只允许 http 和 https 协议。
     /// </summary>
     [Fact]
-    public void NormalizeServiceBaseUrl_ShouldRejectUnsupportedScheme()
+    public void NormalizeThunderBaseUrl_ShouldRejectUnsupportedScheme()
     {
-        Assert.Throws<ArgumentException>(() => PluginConfiguration.NormalizeServiceBaseUrl("ftp://127.0.0.1:8055"));
+        Assert.Throws<ArgumentException>(() => PluginConfiguration.NormalizeThunderBaseUrl("ftp://subtitle.example"));
     }
 
     /// <summary>
@@ -40,6 +40,38 @@ public sealed class PluginConfigurationTests
     public void NormalizeTimeoutSeconds_ShouldClampValue(int input, int expected)
     {
         var value = PluginConfiguration.NormalizeTimeoutSeconds(input);
+
+        Assert.Equal(expected, value);
+    }
+
+    /// <summary>
+    /// 搜索缓存有效期应被限制在 60 秒到 7 天之间。
+    /// </summary>
+    [Theory]
+    [InlineData(-1, 60)]
+    [InlineData(0, 60)]
+    [InlineData(60, 60)]
+    [InlineData(3600, 3600)]
+    [InlineData(9999999, 604800)]
+    public void NormalizeSearchCacheTtlSeconds_ShouldClampValue(int input, int expected)
+    {
+        var value = PluginConfiguration.NormalizeSearchCacheTtlSeconds(input);
+
+        Assert.Equal(expected, value);
+    }
+
+    /// <summary>
+    /// 字幕缓存有效期应被限制在 60 秒到 30 天之间。
+    /// </summary>
+    [Theory]
+    [InlineData(-1, 60)]
+    [InlineData(0, 60)]
+    [InlineData(60, 60)]
+    [InlineData(3600, 3600)]
+    [InlineData(9999999, 2592000)]
+    public void NormalizeSubtitleCacheTtlSeconds_ShouldClampValue(int input, int expected)
+    {
+        var value = PluginConfiguration.NormalizeSubtitleCacheTtlSeconds(input);
 
         Assert.Equal(expected, value);
     }
@@ -91,13 +123,16 @@ public sealed class PluginConfigurationTests
     }
 
     /// <summary>
-    /// 构造默认配置时，应使用自动纳管、并发 1、默认 QSV 渲染节点。
+    /// 构造默认配置时，应使用内置迅雷字幕源、自动纳管、并发 1、默认 QSV 渲染节点。
     /// </summary>
     [Fact]
     public void Constructor_ShouldUseExpectedDefaults()
     {
         var configuration = new PluginConfiguration();
 
+        Assert.Equal("https://api-shoulei-ssl.xunlei.com", configuration.ThunderBaseUrl);
+        Assert.Equal(86400, configuration.SearchCacheTtlSeconds);
+        Assert.Equal(604800, configuration.SubtitleCacheTtlSeconds);
         Assert.True(configuration.EnableAutoVideoConvertToMkv);
         Assert.Equal(PluginConfiguration.DefaultSubtitleWriteModeValue, configuration.DefaultSubtitleWriteMode);
         Assert.Equal(1, configuration.VideoConvertConcurrency);

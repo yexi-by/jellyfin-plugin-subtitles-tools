@@ -24,7 +24,7 @@ namespace Jellyfin.Plugin.SubtitlesTools.Api;
 [Authorize]
 public sealed class SubtitlesToolsController : ControllerBase
 {
-    private readonly SubtitlesToolsApiClient _apiClient;
+    private readonly SubtitleSourceService _subtitleSourceService;
     private readonly FfmpegProcessService _ffmpegProcessService;
     private readonly MultipartSubtitleManagerService _multipartSubtitleManagerService;
 
@@ -32,17 +32,17 @@ public sealed class SubtitlesToolsController : ControllerBase
     /// 初始化控制器。
     /// </summary>
     public SubtitlesToolsController(
-        SubtitlesToolsApiClient apiClient,
+        SubtitleSourceService subtitleSourceService,
         FfmpegProcessService ffmpegProcessService,
         MultipartSubtitleManagerService multipartSubtitleManagerService)
     {
-        _apiClient = apiClient;
+        _subtitleSourceService = subtitleSourceService;
         _ffmpegProcessService = ffmpegProcessService;
         _multipartSubtitleManagerService = multipartSubtitleManagerService;
     }
 
     /// <summary>
-    /// 使用当前表单配置测试 Python 服务端和 FFmpeg 可用性。
+    /// 使用当前表单配置检测内置字幕源和 FFmpeg 可用性。
     /// </summary>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/TestConnection")]
     [Authorize(Policy = Policies.SubtitleManagement)]
@@ -56,15 +56,17 @@ public sealed class SubtitlesToolsController : ControllerBase
         {
             var configuration = new PluginConfiguration
             {
-                ServiceBaseUrl = PluginConfiguration.NormalizeServiceBaseUrl(body.ServiceBaseUrl),
+                ThunderBaseUrl = PluginConfiguration.NormalizeThunderBaseUrl(body.ThunderBaseUrl),
                 RequestTimeoutSeconds = PluginConfiguration.NormalizeTimeoutSeconds(body.RequestTimeoutSeconds),
+                SearchCacheTtlSeconds = PluginConfiguration.NormalizeSearchCacheTtlSeconds(body.SearchCacheTtlSeconds),
+                SubtitleCacheTtlSeconds = PluginConfiguration.NormalizeSubtitleCacheTtlSeconds(body.SubtitleCacheTtlSeconds),
                 EnableAutoVideoConvertToMkv = body.EnableAutoVideoConvertToMkv,
                 VideoConvertConcurrency = PluginConfiguration.NormalizeVideoConvertConcurrency(body.VideoConvertConcurrency),
                 FfmpegExecutablePath = PluginConfiguration.NormalizeFfmpegExecutablePath(body.FfmpegExecutablePath),
                 QsvRenderDevicePath = PluginConfiguration.NormalizeQsvRenderDevicePath(body.QsvRenderDevicePath)
             };
 
-            var result = await _apiClient.CheckHealthAsync(configuration, CancellationToken.None).ConfigureAwait(false);
+            var result = await _subtitleSourceService.CheckHealthAsync(configuration, CancellationToken.None).ConfigureAwait(false);
             var ffmpegValidation = _ffmpegProcessService.ValidateExecutables();
             var supportsQsv = await _ffmpegProcessService.SupportsEncoderAsync("h264_qsv", CancellationToken.None).ConfigureAwait(false);
             if (!OperatingSystem.IsWindows() && !QsvRenderDeviceExists(configuration.QsvRenderDevicePath))
@@ -74,8 +76,7 @@ public sealed class SubtitlesToolsController : ControllerBase
 
             return Ok(new
             {
-                Message = "连接成功。",
-                ServiceBaseUrl = result.ServiceBaseUrl,
+                Message = "内置字幕源检测成功。",
                 TimeoutSeconds = result.TimeoutSeconds,
                 Health = result.Health,
                 Ffmpeg = new
@@ -175,7 +176,11 @@ public sealed class SubtitlesToolsController : ControllerBase
         {
             return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
         }
-        catch (SubtitlesToolsApiException ex)
+        catch (SubtitleProviderTimeoutException ex)
+        {
+            return StatusCode(StatusCodes.Status504GatewayTimeout, new { Message = ex.Message });
+        }
+        catch (SubtitleSourceException ex)
         {
             return StatusCode(StatusCodes.Status502BadGateway, new { Message = ex.Message });
         }
@@ -309,7 +314,15 @@ public sealed class SubtitlesToolsController : ControllerBase
         {
             return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
         }
-        catch (SubtitlesToolsApiException ex)
+        catch (SubtitleNotFoundException ex)
+        {
+            return NotFound(new { Message = ex.Message });
+        }
+        catch (SubtitleProviderTimeoutException ex)
+        {
+            return StatusCode(StatusCodes.Status504GatewayTimeout, new { Message = ex.Message });
+        }
+        catch (SubtitleSourceException ex)
         {
             return StatusCode(StatusCodes.Status502BadGateway, new { Message = ex.Message });
         }
@@ -442,7 +455,11 @@ public sealed class SubtitlesToolsController : ControllerBase
         {
             return StatusCode(StatusCodes.Status500InternalServerError, new { Message = ex.Message });
         }
-        catch (SubtitlesToolsApiException ex)
+        catch (SubtitleProviderTimeoutException ex)
+        {
+            return StatusCode(StatusCodes.Status504GatewayTimeout, new { Message = ex.Message });
+        }
+        catch (SubtitleSourceException ex)
         {
             return StatusCode(StatusCodes.Status502BadGateway, new { Message = ex.Message });
         }
@@ -454,19 +471,29 @@ public sealed class SubtitlesToolsController : ControllerBase
 }
 
 /// <summary>
-/// 配置页测试连接请求体。
+/// 配置页运行检测请求体。
 /// </summary>
 public sealed class TestConnectionRequest
 {
     /// <summary>
-    /// 获取或设置 Python 服务地址。
+    /// 获取或设置迅雷字幕接口根地址。
     /// </summary>
-    public string? ServiceBaseUrl { get; set; }
+    public string? ThunderBaseUrl { get; set; }
 
     /// <summary>
-    /// 获取或设置请求超时秒数。
+    /// 获取或设置上游字幕源请求超时秒数。
     /// </summary>
     public int RequestTimeoutSeconds { get; set; }
+
+    /// <summary>
+    /// 获取或设置搜索缓存有效期秒数。
+    /// </summary>
+    public int SearchCacheTtlSeconds { get; set; }
+
+    /// <summary>
+    /// 获取或设置字幕文件缓存有效期秒数。
+    /// </summary>
+    public int SubtitleCacheTtlSeconds { get; set; }
 
     /// <summary>
     /// 获取或设置是否在新视频入库后自动纳管并修复安卓硬解兼容。

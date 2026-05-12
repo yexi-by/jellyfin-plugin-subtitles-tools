@@ -27,7 +27,7 @@ public sealed class MultipartSubtitleManagerService
     private readonly IProviderManager _providerManager;
     private readonly IFileSystem _fileSystem;
     private readonly MkvMetadataIdentityService _mkvMetadataIdentityService;
-    private readonly SubtitlesToolsApiClient _subtitlesToolsApiClient;
+    private readonly SubtitleSourceService _subtitleSourceService;
     private readonly MultipartMediaParserService _multipartMediaParserService;
     private readonly SubtitleMetadataService _subtitleMetadataService;
     private readonly SubtitleSrtConversionService _subtitleSrtConversionService;
@@ -43,7 +43,7 @@ public sealed class MultipartSubtitleManagerService
         IProviderManager providerManager,
         IFileSystem fileSystem,
         MkvMetadataIdentityService mkvMetadataIdentityService,
-        SubtitlesToolsApiClient subtitlesToolsApiClient,
+        SubtitleSourceService subtitleSourceService,
         MultipartMediaParserService multipartMediaParserService,
         SubtitleMetadataService subtitleMetadataService,
         SubtitleSrtConversionService subtitleSrtConversionService,
@@ -55,7 +55,7 @@ public sealed class MultipartSubtitleManagerService
         _providerManager = providerManager;
         _fileSystem = fileSystem;
         _mkvMetadataIdentityService = mkvMetadataIdentityService;
-        _subtitlesToolsApiClient = subtitlesToolsApiClient;
+        _subtitleSourceService = subtitleSourceService;
         _multipartMediaParserService = multipartMediaParserService;
         _subtitleMetadataService = subtitleMetadataService;
         _subtitleSrtConversionService = subtitleSrtConversionService;
@@ -88,7 +88,7 @@ public sealed class MultipartSubtitleManagerService
     }
 
     /// <summary>
-    /// 为指定分段先确保“已纳管且已兼容”，再调用 Python 服务搜索字幕。
+    /// 为指定分段先确保“已纳管且已兼容”，再调用内置字幕源搜索字幕。
     /// </summary>
     public async Task<ManagedPartSearchResponseDto> SearchPartAsync(Guid itemId, string partId, CancellationToken cancellationToken)
     {
@@ -109,7 +109,7 @@ public sealed class MultipartSubtitleManagerService
         }
 
         var managedFile = new FileInfo(management.Identity.MediaPath);
-        var serviceResponse = await _subtitlesToolsApiClient.SearchAsync(
+        var serviceResponse = await _subtitleSourceService.SearchAsync(
                 new SubtitleSearchRequestDto
                 {
                     Gcid = management.Identity.OriginalGcid,
@@ -391,7 +391,7 @@ public sealed class MultipartSubtitleManagerService
                 }
 
                 var managedFile = new FileInfo(management.Identity.MediaPath);
-                var searchResponse = await _subtitlesToolsApiClient.SearchAsync(
+                var searchResponse = await _subtitleSourceService.SearchAsync(
                         new SubtitleSearchRequestDto
                         {
                             Gcid = management.Identity.OriginalGcid,
@@ -456,7 +456,7 @@ public sealed class MultipartSubtitleManagerService
                     ExternalSubtitle = writeResult.ExternalSubtitle
                 });
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or SubtitlesToolsApiException or FfmpegExecutionException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or SubtitleSourceException or FfmpegExecutionException)
             {
                 _logger.LogWarning(ex, "trace={TraceId} multipart_download_best_part_failed item_id={ItemId} part_id={PartId}", traceId, itemId, part.Id);
                 items.Add(new ManagedBatchPartResultDto
@@ -561,7 +561,7 @@ public sealed class MultipartSubtitleManagerService
     {
         var management = await _mkvMetadataIdentityService.EnsureManagedAsync(part.MediaFile.FullName, cancellationToken, traceId).ConfigureAwait(false);
         var managedFile = new FileInfo(management.Identity.MediaPath);
-        var downloadedSubtitle = await _subtitlesToolsApiClient.DownloadSubtitleAsync(request.SubtitleId, cancellationToken, traceId).ConfigureAwait(false);
+        var downloadedSubtitle = await _subtitleSourceService.DownloadSubtitleAsync(request.SubtitleId, cancellationToken, traceId).ConfigureAwait(false);
 
         FileInfo? temporarySrtFile = null;
         try
@@ -622,7 +622,7 @@ public sealed class MultipartSubtitleManagerService
     {
         var management = await _mkvMetadataIdentityService.EnsureManagedAsync(part.MediaFile.FullName, cancellationToken, traceId).ConfigureAwait(false);
         var managedFile = new FileInfo(management.Identity.MediaPath);
-        var downloadedSubtitle = await _subtitlesToolsApiClient.DownloadSubtitleAsync(request.SubtitleId, cancellationToken, traceId).ConfigureAwait(false);
+        var downloadedSubtitle = await _subtitleSourceService.DownloadSubtitleAsync(request.SubtitleId, cancellationToken, traceId).ConfigureAwait(false);
 
         FileInfo? temporarySrtFile = null;
         try
