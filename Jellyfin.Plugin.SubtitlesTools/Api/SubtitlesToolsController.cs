@@ -16,8 +16,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace Jellyfin.Plugin.SubtitlesTools.Api;
 
 /// <summary>
-/// 提供插件配置测试、分段纳管、字幕搜索、下载写入与内封字幕删除所需的接口。
-/// 当前版本会先纳管并修复视频兼容性，再执行字幕搜索、下载和字幕写入；写入模式支持内封与外挂。
+/// 提供插件配置测试、分段处理、字幕搜索、下载写入与内封字幕删除所需的接口。
+/// 当前版本会先处理并修复视频兼容性，再执行字幕搜索、下载和字幕写入；写入模式支持内封与外挂。
 /// </summary>
 [ApiController]
 [Produces(MediaTypeNames.Application.Json)]
@@ -116,7 +116,7 @@ public sealed class SubtitlesToolsController : ControllerBase
     }
 
     /// <summary>
-    /// 获取媒体项的分段结构、纳管状态与已内封字幕流。
+    /// 获取媒体项的分段结构、处理状态与已内封字幕流。
     /// </summary>
     [HttpGet("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts")]
     [ProducesResponseType(typeof(ManagedItemPartsResponseDto), StatusCodes.Status200OK)]
@@ -140,7 +140,7 @@ public sealed class SubtitlesToolsController : ControllerBase
     }
 
     /// <summary>
-    /// 为指定分段先纳管，再搜索字幕候选。
+    /// 为指定分段先处理，再搜索字幕候选。
     /// </summary>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts/{partId}/search")]
     [ProducesResponseType(typeof(ManagedPartSearchResponseDto), StatusCodes.Status200OK)]
@@ -191,7 +191,7 @@ public sealed class SubtitlesToolsController : ControllerBase
     }
 
     /// <summary>
-    /// 手动把当前分段纳管为 MKV。
+    /// 手动把当前分段处理为 MKV。
     /// </summary>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/parts/{partId}/convert")]
     [ProducesResponseType(typeof(ManagedPartConvertResponseDto), StatusCodes.Status200OK)]
@@ -234,7 +234,7 @@ public sealed class SubtitlesToolsController : ControllerBase
     }
 
     /// <summary>
-    /// 一键把整组分段纳管为 MKV。
+    /// 一键把整组分段处理为 MKV。
     /// </summary>
     [HttpPost("Jellyfin.Plugin.SubtitlesTools/Items/{itemId:guid}/convert-group")]
     [ProducesResponseType(typeof(ManagedBatchOperationResponseDto), StatusCodes.Status200OK)]
@@ -496,12 +496,12 @@ public sealed class TestConnectionRequest
     public int SubtitleCacheTtlSeconds { get; set; }
 
     /// <summary>
-    /// 获取或设置是否在新视频入库后自动纳管并修复安卓硬解兼容。
+    /// 获取或设置是否在新视频入库后自动处理并修复安卓硬解兼容。
     /// </summary>
     public bool EnableAutoVideoConvertToMkv { get; set; }
 
     /// <summary>
-    /// 获取或设置视频转换并发数。
+    /// 获取或设置同时转换数。
     /// </summary>
     public int VideoConvertConcurrency { get; set; }
 

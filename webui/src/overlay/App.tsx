@@ -87,7 +87,7 @@ function CurrentPartCard({
         </summary>
         <div className="grid gap-3 border-t border-white/5 px-3 py-3 sm:grid-cols-2">
           <InfoField label="容器" value={(part.Container || '-').toUpperCase()} />
-          <InfoField label="风险判断" value={part.RiskVerdict || '等待检查'} />
+          <InfoField label="兼容性" value={part.RiskVerdict || '等待检查'} />
           <InfoField label="文件路径" value={part.MediaPath || '-'} />
           <InfoField label="字幕轨道数" value={String(embeddedCount + externalCount)} />
         </div>
@@ -199,7 +199,7 @@ function SubtitleList({
             actionLabel={track.IsPluginManaged ? '删除' : undefined}
             badges={[
               <Badge key="kind" tone="neutral">视频内字幕</Badge>,
-              ...(track.IsPluginManaged ? [<Badge key="managed" tone="success">由本工具添加</Badge>] : [])
+              ...(track.IsPluginManaged ? [<Badge key="managed" tone="success">由此插件添加</Badge>] : [])
             ]}
             meta={`语言：${track.Language || '未知'} · 格式：${(track.Format || 'srt').toUpperCase()}`}
             title={track.Title || `字幕轨道 #${track.StreamIndex}`}
@@ -418,7 +418,7 @@ export function OverlayApp({
                 搜索当前文件
               </Button>
               <Button className="w-full" disabled={state.busy || !activePart} type="button" variant="secondary" onClick={() => void actions.convertCurrentPart()}>
-                优化当前文件
+                转换兼容格式
               </Button>
               <div className="xl:col-span-1">
                 <WriteModeSwitch disabled={state.busy} mode={state.subtitleWriteMode} onChange={actions.setSubtitleWriteMode} />
@@ -431,7 +431,7 @@ export function OverlayApp({
               <SectionHeading title="整组操作" description="一次处理当前媒体的全部文件，耗时会更长。" />
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button className="w-full" disabled={state.busy} type="button" variant="secondary" onClick={() => void actions.convertGroup()}>
-                  整组优化
+                  整组转换
                 </Button>
                 <Button className="w-full" disabled={state.busy} type="button" variant="primary" onClick={() => void actions.downloadBest()}>
                   整组自动选字幕

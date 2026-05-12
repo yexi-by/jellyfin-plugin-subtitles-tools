@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 负责把视频统一纳管为 MKV，并在需要时执行 Intel QSV 兼容修复重编码。
+/// 负责把视频统一处理为 MKV，并在需要时执行 Intel QSV 兼容修复重编码。
 /// 当前版本只支持“无损 remux”与“软件解码 + QSV 编码”两条路径，不再回退 CPU 或 VAAPI。
 /// </summary>
 public sealed class VideoContainerConversionService
@@ -29,7 +29,7 @@ public sealed class VideoContainerConversionService
     }
 
     /// <summary>
-    /// 把当前视频无损纳管为 MKV。
+    /// 把当前视频无损处理为 MKV。
     /// 若当前已是 MKV，则只返回原路径，不做额外操作。
     /// </summary>
     public async Task<VideoConversionResult> EnsureMkvAsync(

@@ -7,7 +7,7 @@ namespace Jellyfin.Plugin.SubtitlesTools.Configuration;
 
 /// <summary>
 /// 插件配置对象。
-/// 当前版本默认把视频纳管到 MKV，并在命中高风险老编码时使用 Intel QSV 修复安卓硬解兼容性。
+/// 当前版本默认把视频处理为 MKV，并在命中高风险老编码时使用 Intel QSV 修复安卓硬解兼容性。
 /// </summary>
 public class PluginConfiguration : BasePluginConfiguration
 {
@@ -32,12 +32,12 @@ public class PluginConfiguration : BasePluginConfiguration
     public const int DefaultSubtitleCacheTtlSeconds = 7 * 24 * 60 * 60;
 
     /// <summary>
-    /// 默认开启“新视频入库后自动纳管并修复安卓硬解兼容”。
+    /// 默认开启”新视频入库后自动处理并修复安卓硬解兼容”。
     /// </summary>
     public const bool DefaultEnableAutoVideoConvertToMkv = true;
 
     /// <summary>
-    /// 默认视频转换并发数。
+    /// 默认同时转换数。
     /// </summary>
     public const int DefaultVideoConvertConcurrency = 1;
 
@@ -89,12 +89,12 @@ public class PluginConfiguration : BasePluginConfiguration
     public int SubtitleCacheTtlSeconds { get; set; }
 
     /// <summary>
-    /// 是否在新视频入库后自动纳管并修复安卓硬解兼容。
+    /// 是否在新视频入库后自动处理并修复安卓硬解兼容。
     /// </summary>
     public bool EnableAutoVideoConvertToMkv { get; set; }
 
     /// <summary>
-    /// 视频转换并发数。
+    /// 同时转换数。
     /// </summary>
     public int VideoConvertConcurrency { get; set; }
 
@@ -114,7 +114,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public string QsvRenderDevicePath { get; set; }
 
     /// <summary>
-    /// 新视频入库自动预处理的路径黑名单。
+    /// 新视频入库自动转换的路径黑名单。
     /// </summary>
     public string[] AutoPreprocessPathBlacklist { get; set; }
 
@@ -189,7 +189,7 @@ public class PluginConfiguration : BasePluginConfiguration
     }
 
     /// <summary>
-    /// 限制视频转换并发，避免 NAS 过载。
+    /// 限制同时转换数，避免 NAS 过载。
     /// </summary>
     public static int NormalizeVideoConvertConcurrency(int value)
     {
@@ -233,7 +233,7 @@ public class PluginConfiguration : BasePluginConfiguration
     }
 
     /// <summary>
-    /// 规范化自动预处理路径黑名单，去除空白项并按路径语义去重。
+    /// 规范化自动转换路径黑名单，去除空白项并按路径语义去重。
     /// </summary>
     /// <param name="values">用户配置的黑名单路径集合。</param>
     /// <returns>可持久化的黑名单路径集合。</returns>
@@ -265,7 +265,7 @@ public class PluginConfiguration : BasePluginConfiguration
     }
 
     /// <summary>
-    /// 判断媒体路径是否命中自动预处理路径黑名单。
+    /// 判断媒体路径是否命中自动转换路径黑名单。
     /// </summary>
     /// <param name="mediaPath">待检查的媒体文件路径。</param>
     /// <param name="blacklistPaths">用户配置的黑名单目录集合。</param>
@@ -276,7 +276,7 @@ public class PluginConfiguration : BasePluginConfiguration
     }
 
     /// <summary>
-    /// 判断媒体路径是否命中自动预处理路径黑名单，并返回命中的黑名单目录。
+    /// 判断媒体路径是否命中自动转换路径黑名单，并返回命中的黑名单目录。
     /// </summary>
     /// <param name="mediaPath">待检查的媒体文件路径。</param>
     /// <param name="blacklistPaths">用户配置的黑名单目录集合。</param>

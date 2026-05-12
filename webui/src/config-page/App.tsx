@@ -202,7 +202,7 @@ export function ConfigPageApp(): JSX.Element {
 
         <div className="flex flex-col gap-6">
           <Panel>
-            <SectionHeading title="字幕源检测" description="检查内置迅雷字幕源、FFmpeg 与硬解修复环境。" />
+            <SectionHeading title="字幕源检测" description="检查内置迅雷字幕源、FFmpeg 与视频兼容性。" />
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-sm font-medium text-gray-200">运行检测</span>
               <Button className="w-full sm:w-auto" size="sm" disabled={busy} type="button" variant="secondary" onClick={() => void testConnection()}>
@@ -243,14 +243,14 @@ export function ConfigPageApp(): JSX.Element {
                   onChange={event => setConfiguration(current => ({ ...current, EnableAutoVideoConvertToMkv: event.target.checked }))}
                 />
                 <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium text-gray-200">新视频入库时自动预处理</span>
-                  <span className="text-xs text-gray-500">开启后，新视频进入媒体库时会自动计算 CID/GCID；如果需要，还会转为 MKV 或修复播放兼容性。关闭后，只在你手动处理字幕时才会执行这些步骤。</span>
+                  <span className="text-sm font-medium text-gray-200">新视频入库时自动转换</span>
+                  <span className="text-xs text-gray-500">开启后，新视频进入媒体库时会自动计算文件指纹；如果需要，还会转为 MKV 或修复播放兼容性。关闭后，只在你手动处理字幕时才会执行这些步骤。</span>
                 </div>
               </label>
 
               <FieldShell
-                label="自动预处理路径黑名单"
-                description="每行填写一个媒体目录。新视频位于这些目录内时，会跳过入库自动预处理；手动纳管和字幕操作不受影响。"
+                label="自动转换路径黑名单"
+                description="每行填写一个媒体目录。新视频位于这些目录内时，会跳过入库自动转换；手动处理和字幕操作不受影响。"
               >
                 <textarea
                   className={`${textInputClassName()} min-h-28 resize-y leading-6`}
@@ -302,7 +302,7 @@ export function ConfigPageApp(): JSX.Element {
                   onChange={event => setConfiguration(current => ({ ...current, SubtitleCacheTtlSeconds: Number.parseInt(event.target.value, 10) || 604800 }))}
                 />
               </FieldShell>
-              <FieldShell label="转换并发数">
+              <FieldShell label="同时转换数">
                 <input
                   className={textInputClassName()}
                   max={4}

@@ -8,14 +8,14 @@ using MediaBrowser.Model.Tasks;
 namespace Jellyfin.Plugin.SubtitlesTools;
 
 /// <summary>
-/// 在 Jellyfin 计划任务中提供“历史影片一键纳管并修复安卓硬解兼容”的手动入口。
+/// 在 Jellyfin 计划任务中提供”历史影片批量处理（转为 MKV 并修复安卓播放兼容）”的手动入口。
 /// </summary>
 public sealed class PrecomputeMissingHashesScheduledTask : IScheduledTask, IConfigurableScheduledTask
 {
     private readonly VideoHashBackfillService _videoHashBackfillService;
 
     /// <summary>
-    /// 初始化历史影片一键纳管任务。
+    /// 初始化历史影片批量处理任务。
     /// </summary>
     public PrecomputeMissingHashesScheduledTask(VideoHashBackfillService videoHashBackfillService)
     {
@@ -23,13 +23,13 @@ public sealed class PrecomputeMissingHashesScheduledTask : IScheduledTask, IConf
     }
 
     /// <inheritdoc />
-    public string Name => "一键算 CID/GCID 并转换为 MKV（含安卓硬解兼容修复）";
+    public string Name => "批量处理历史视频（转为 MKV 并修复安卓播放兼容）";
 
     /// <inheritdoc />
     public string Key => "SubtitlesTools.PrecomputeMissingVideoHashes";
 
     /// <inheritdoc />
-    public string Description => "扫描已入库的电影和剧集，对未纳管影片补算 CID/GCID 并纳管为 MKV，同时继续修复那些仍命中高风险硬解规则的旧视频。";
+    public string Description => "扫描已入库的电影和剧集，对未处理影片补算文件指纹并转为 MKV，同时继续修复那些仍存在兼容性问题的旧视频。";
 
     /// <inheritdoc />
     public string Category => "Subtitles Tools";

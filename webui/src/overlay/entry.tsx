@@ -109,7 +109,7 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       return;
     }
 
-    setStatus('没有找到字幕', '可以稍后再试，或先优化当前文件。', 'idle');
+    setStatus('没有找到字幕', '可以稍后再试，或先转换当前文件。', 'idle');
   }
 
   async function convertCurrentPart(): Promise<void> {
@@ -119,12 +119,12 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       throw new Error('当前没有选中的有效文件。');
     }
 
-    setStatus('正在优化当前文件', '这一步可能需要一点时间。', 'busy');
+    setStatus('正在转换当前文件', '这一步可能需要一点时间。', 'busy');
     const result = await convertPart(snapshot.itemId, activePart);
     setBatchResults([]);
     applyOperationResultToPart(activePart.Id, result);
     await refreshOverlayDataWithRetry(createSinglePartRefreshValidator(activePart.Id, result));
-    setStatus('当前文件已优化', '现在可以继续搜索或保存字幕。', 'success');
+    setStatus('当前文件已转换', '现在可以继续搜索或保存字幕。', 'success');
   }
 
   async function convertCurrentGroup(): Promise<void> {
@@ -133,13 +133,13 @@ if (!window.__subtitlesToolsGlobalLoaded) {
       throw new Error('当前页面没有可管理的媒体详情。');
     }
 
-    setStatus('正在优化整组文件', '请不要关闭当前页面。', 'busy');
+    setStatus('正在转换整组文件', '请不要关闭当前页面。', 'busy');
     const payload = await convertGroup(snapshot.itemId);
     const items = payload.Items ?? [];
     setBatchResults(items);
     applyBatchResults(items);
     await refreshOverlayDataWithRetry(createBatchRefreshValidator(items));
-    setStatus('整组已优化', '全部文件已完成兼容性处理。', 'success');
+    setStatus('整组已转换', '全部文件已完成兼容性处理。', 'success');
   }
 
   async function downloadCurrentCandidate(candidateId: string): Promise<void> {
@@ -253,11 +253,11 @@ if (!window.__subtitlesToolsGlobalLoaded) {
         actions={{
           closeOverlay,
           convertCurrentPart: () => withBusyState(convertCurrentPart, {
-            title: '优化失败',
+            title: '转换失败',
             message: '请检查视频文件和转码环境。'
           }),
           convertGroup: () => withBusyState(convertCurrentGroup, {
-            title: '优化失败',
+            title: '转换失败',
             message: '请检查视频文件和转码环境。'
           }),
           deleteEmbeddedSubtitle: (streamIndex: number) => withBusyState(() => removeEmbeddedSubtitle(streamIndex), {

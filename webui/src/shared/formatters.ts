@@ -79,7 +79,7 @@ export function buildSuccessConnectionStatus(payload: ConnectionHealthPayload): 
     details: [
       { label: '插件版本', value: readValue(health, ['Version', 'version'], '-') },
       { label: '字幕源', value: readValue(health, ['ProviderName', 'providerName', 'provider_name'], '-') },
-      { label: '上游地址', value: readValue(health, ['ProviderBaseUrl', 'providerBaseUrl', 'provider_base_url'], '-') },
+      { label: '迅雷接口', value: readValue(health, ['ProviderBaseUrl', 'providerBaseUrl', 'provider_base_url'], '-') },
       { label: '搜索缓存', value: readNumberValue(health, ['SearchCacheTtlSeconds', 'searchCacheTtlSeconds', 'search_cache_ttl_seconds'], '-') },
       { label: '字幕缓存', value: readNumberValue(health, ['SubtitleCacheTtlSeconds', 'subtitleCacheTtlSeconds', 'subtitle_cache_ttl_seconds'], '-') },
       { label: 'FFmpeg', value: readValue(ffmpeg, ['ffmpegPath', 'FfmpegPath'], '-') },
@@ -95,13 +95,13 @@ export function buildErrorConnectionStatus(): ConnectionStatusViewModel {
     tone: 'error',
     label: '失败',
     title: '字幕源检测失败',
-    message: '无法完成检测，请检查上游地址、超时和 FFmpeg 配置。',
+    message: '无法完成检测，请检查迅雷接口地址、超时和 FFmpeg 配置。',
     details: []
   };
 }
 
 export function getManagedStatusText(part: MediaPart): string {
-  return part.IsManaged === true ? '已识别' : '待处理';
+  return part.IsManaged === true ? '已就绪' : '待处理';
 }
 
 export function getManagedStatusTone(part: MediaPart): Extract<UiTone, 'neutral' | 'success'> {
@@ -114,7 +114,7 @@ export function getCompatibilityStatusText(part: MediaPart): string {
   }
 
   if (hasCompatibilityRisk(part)) {
-    return '建议先优化';
+    return '建议先转换';
   }
 
   return '播放正常';
@@ -151,7 +151,7 @@ export function getBatchTone(status: string | undefined): Extract<UiTone, 'neutr
 export function getBatchStatusText(status: string | undefined): string {
   const labels: Record<string, string> = {
     completed: '已完成',
-    converted: '已优化',
+    converted: '已转换',
     deleted: '已删除',
     embedded: '写入视频',
     failed: '失败',
@@ -173,7 +173,7 @@ export function getBatchSummaryMessage(item: OperationResultItem): string {
   }
 
   if (item.Status === 'converted') {
-    return '已完成播放兼容性优化。';
+    return '已完成播放兼容性转换。';
   }
 
   if (item.Status === 'deleted') {
@@ -220,7 +220,7 @@ export function getItemMetrics(itemData: ItemPartsPayload): BatchMetric[] {
       tone: subtitleCount > 0 ? 'success' : 'neutral'
     },
     {
-      label: '建议优化',
+      label: '需转换',
       value: String(repairCount),
       tone: repairCount === 0 ? 'success' : 'warning'
     }
@@ -266,15 +266,15 @@ export function getDefaultOverlayStatus(part: MediaPart | null): {
     return {
       tone: 'idle',
       title: '当前文件还不能直接保存字幕',
-      message: '建议先刷新状态或先优化当前文件。'
+      message: '建议先刷新状态或先转换当前文件。'
     };
   }
 
   if (hasCompatibilityRisk(part)) {
     return {
       tone: 'idle',
-      title: '建议先优化当前文件',
-      message: '这样更稳，后续保存字幕也更顺畅。'
+      title: '建议先转换当前文件',
+      message: '转换后可确保字幕正常内封和播放。'
     };
   }
 

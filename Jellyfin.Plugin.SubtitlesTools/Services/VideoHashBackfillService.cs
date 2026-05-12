@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 扫描现有媒体库，把尚未被插件纳管或仍需兼容修复的本地视频统一处理为受管 MKV。
+/// 扫描现有媒体库，把尚未被插件处理或仍需兼容修复的本地视频统一转为受管 MKV。
 /// 当前版本不再依赖插件侧哈希归档，而是只认 MKV 自定义元数据和视频自身的兼容风险。
 /// </summary>
 public sealed class VideoHashBackfillService
@@ -27,7 +27,7 @@ public sealed class VideoHashBackfillService
     private readonly ILogger<VideoHashBackfillService> _logger;
 
     /// <summary>
-    /// 初始化手动纳管回填服务。
+    /// 初始化手动处理回填服务。
     /// </summary>
     public VideoHashBackfillService(
         ILibraryManager libraryManager,
@@ -44,8 +44,8 @@ public sealed class VideoHashBackfillService
     }
 
     /// <summary>
-    /// 扫描 Jellyfin 已入库的本地电影和剧集，把未纳管文件统一纳管为 MKV，
-    /// 并继续修复那些“已纳管但仍命中高风险硬解规则”的旧视频。
+    /// 扫描 Jellyfin 已入库的本地电影和剧集，把未处理文件统一转为 MKV，
+    /// 并继续修复那些”已处理但仍存在兼容性问题”的旧视频。
     /// </summary>
     public async Task ManageUnprocessedVideosAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
@@ -125,7 +125,7 @@ public sealed class VideoHashBackfillService
     }
 
     /// <summary>
-    /// 判断一个已入库项目是否符合“本地电影或剧集文件”的纳管条件。
+    /// 判断一个已入库项目是否符合”本地电影或剧集文件”的处理条件。
     /// </summary>
     internal static bool TryGetEligibleMediaPath(BaseItem? item, out string mediaPath)
     {
@@ -218,7 +218,7 @@ public sealed class VideoHashBackfillService
     }
 
     /// <summary>
-    /// 表示一个待纳管的 Jellyfin 媒体项。
+    /// 表示一个待处理的 Jellyfin 媒体项。
     /// </summary>
     private sealed class EligibleMediaItem
     {

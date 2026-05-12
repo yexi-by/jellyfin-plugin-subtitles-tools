@@ -73,7 +73,7 @@ public sealed class FfmpegProcessService
 
     /// <summary>
     /// 读取当前媒体的容器信息以及视频、音频、字幕流摘要。
-    /// 该方法只返回插件做纳管和硬解风险判定所需的最小字段。
+    /// 该方法只返回插件做处理和兼容性判定所需的最小字段。
     /// </summary>
     public async Task<ProbedMediaInfo> ProbeMediaAsync(
         string mediaPath,

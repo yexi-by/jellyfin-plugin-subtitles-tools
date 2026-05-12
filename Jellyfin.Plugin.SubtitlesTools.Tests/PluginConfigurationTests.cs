@@ -77,7 +77,7 @@ public sealed class PluginConfigurationTests
     }
 
     /// <summary>
-    /// 视频转换并发数应被限制在 1 到 4 之间。
+    /// 同时转换数应被限制在 1 到 4 之间。
     /// </summary>
     [Theory]
     [InlineData(-1, 1)]
@@ -123,7 +123,7 @@ public sealed class PluginConfigurationTests
     }
 
     /// <summary>
-    /// 构造默认配置时，应使用内置迅雷字幕源、自动纳管、并发 1、默认 QSV 渲染节点。
+    /// 构造默认配置时，应使用内置迅雷字幕源、自动处理、同时转换数 1、默认 QSV 渲染节点。
     /// </summary>
     [Fact]
     public void Constructor_ShouldUseExpectedDefaults()
@@ -159,7 +159,7 @@ public sealed class PluginConfigurationTests
     }
 
     /// <summary>
-    /// 自动预处理路径黑名单应去除空白项、尾部分隔符和重复目录。
+    /// 自动转换路径黑名单应去除空白项、尾部分隔符和重复目录。
     /// </summary>
     [Fact]
     public void NormalizeAutoPreprocessPathBlacklist_ShouldTrimAndDeduplicatePaths()

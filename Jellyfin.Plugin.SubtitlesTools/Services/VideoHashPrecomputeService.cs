@@ -14,8 +14,8 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 在插件后台持续处理“新视频入库后自动纳管为 MKV”的任务队列。
-/// 自动纳管会统一走“确保当前文件已被 MKV 元数据纳管”的流程。
+/// 在插件后台持续处理”新视频入库后自动转为 MKV”的任务队列。
+/// 自动处理会统一走”确保当前文件已被 MKV 元数据处理”的流程。
 /// </summary>
 public sealed class VideoHashPrecomputeService : BackgroundService
 {
@@ -35,7 +35,7 @@ public sealed class VideoHashPrecomputeService : BackgroundService
     private readonly ConcurrentDictionary<string, byte> _scheduledMediaPaths = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// 初始化后台自动纳管服务。
+    /// 初始化后台自动处理服务。
     /// </summary>
     public VideoHashPrecomputeService(
         ILibraryManager libraryManager,

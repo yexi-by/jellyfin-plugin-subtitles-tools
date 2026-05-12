@@ -9,8 +9,8 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 统一负责读取、判断和写入 MKV 自定义元数据中的原始 CID/GCID。
-/// 当前版本不仅要确保“已纳管”，还要确保当前视频已经修复到适合安卓硬解的兼容形态。
+/// 统一负责读取、判断和写入 MKV 自定义元数据中的原始文件指纹。
+/// 当前版本不仅要确保”已处理”，还要确保当前视频已经修复到适合安卓硬解的兼容形态。
 /// </summary>
 public sealed class MkvMetadataIdentityService
 {
@@ -47,7 +47,7 @@ public sealed class MkvMetadataIdentityService
 
     /// <summary>
     /// 尝试从当前媒体文件读取插件元数据。
-    /// 只有 MKV 且原始 CID/GCID 完整时，才视为已经纳管。
+    /// 只有 MKV 且原始文件指纹完整时，才视为已经处理。
     /// </summary>
     public async Task<ManagedMediaIdentity?> TryGetIdentityAsync(
         string mediaPath,
@@ -118,7 +118,7 @@ public sealed class MkvMetadataIdentityService
     }
 
     /// <summary>
-    /// 确保当前文件已经完成“纳管 + 安卓硬解兼容修复”。
+    /// 确保当前文件已经完成”处理 + 安卓硬解兼容修复”。
     /// 命中高风险时会优先执行 Intel QSV 重编码；其余场景只做 remux 或补写元数据。
     /// </summary>
     public async Task<ManagedMediaIdentityResult> EnsureManagedAsync(
@@ -131,7 +131,7 @@ public sealed class MkvMetadataIdentityService
         var sourceFile = new FileInfo(mediaPath);
         if (!sourceFile.Exists)
         {
-            throw new FileNotFoundException("媒体文件不存在，无法纳管。", mediaPath);
+            throw new FileNotFoundException("媒体文件不存在，无法处理。", mediaPath);
         }
 
         var existingIdentity = await TryGetIdentityAsync(sourceFile.FullName, cancellationToken, traceId).ConfigureAwait(false);
@@ -142,7 +142,7 @@ public sealed class MkvMetadataIdentityService
             return new ManagedMediaIdentityResult
             {
                 Identity = existingIdentity,
-                Message = "当前文件已纳管且不命中高风险硬解规则，无需重复处理。",
+                Message = "当前文件已处理且兼容性正常，无需重复处理。",
                 ConvertedToMkv = false,
                 WroteMetadata = false,
                 UsedCompatibilityRepairReencode = false,
@@ -166,7 +166,7 @@ public sealed class MkvMetadataIdentityService
 
             var repairedResult = await BuildManagedResultAsync(
                     qsvResult.OutputPath,
-                    "当前文件虽然已纳管，但仍命中高风险硬解规则，已使用 Intel QSV 重编码修复。",
+                    "当前文件虽然已处理，但仍存在兼容性问题，已使用 Intel QSV 重编码修复。",
                     convertedToMkv: true,
                     wroteMetadata: true,
                     usedCompatibilityRepairReencode: qsvResult.UsedCompatibilityRepairReencode,
@@ -197,7 +197,7 @@ public sealed class MkvMetadataIdentityService
 
             var repairedResult = await BuildManagedResultAsync(
                     qsvResult.OutputPath,
-                    "当前文件命中高风险硬解规则，已先计算 CID/GCID 并通过 Intel QSV 重编码为兼容 MKV。",
+                    "当前文件存在兼容性问题，已先计算文件指纹并通过 Intel QSV 重编码为兼容 MKV。",
                     convertedToMkv: true,
                     wroteMetadata: true,
                     usedCompatibilityRepairReencode: qsvResult.UsedCompatibilityRepairReencode,
@@ -248,7 +248,7 @@ public sealed class MkvMetadataIdentityService
 
         var metadataOnlyResult = await BuildManagedResultAsync(
                 sourceFile.FullName,
-                "当前 MKV 原先未纳管，已为其计算 CID/GCID 并写入 MKV 元数据。",
+                "当前 MKV 原先未处理，已为其计算文件指纹并写入 MKV 元数据。",
                 convertedToMkv: false,
                 wroteMetadata: true,
                 usedCompatibilityRepairReencode: false,
@@ -296,7 +296,7 @@ public sealed class MkvMetadataIdentityService
         var identity = await TryGetIdentityAsync(mediaPath, cancellationToken, traceId).ConfigureAwait(false);
         if (identity is null)
         {
-            throw new InvalidOperationException("已完成 MKV 纳管流程，但未能从输出文件中读取到插件元数据。");
+            throw new InvalidOperationException("已完成 MKV 处理流程，但未能从输出文件中读取到插件元数据。");
         }
 
         return identity;
@@ -352,7 +352,7 @@ public sealed class ManagedMediaInspectionResult
 }
 
 /// <summary>
-/// 表示“确保文件已纳管且已兼容”操作的结果。
+/// 表示”确保文件已处理且已兼容”操作的结果。
 /// </summary>
 public sealed class ManagedMediaIdentityResult
 {

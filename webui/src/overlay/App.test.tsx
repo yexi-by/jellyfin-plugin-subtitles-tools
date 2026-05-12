@@ -124,7 +124,7 @@ describe('OverlayApp', () => {
     expect(screen.getByRole('heading', { name: '整组操作' })).toBeInTheDocument();
     expect(screen.getByText('外挂字幕')).toBeInTheDocument();
     expect(screen.getByText('视频内字幕')).toBeInTheDocument();
-    expect(screen.getByText('由本工具添加')).toBeInTheDocument();
+    expect(screen.getByText('由此插件添加')).toBeInTheDocument();
     expect(screen.getByText('movie-part-1.zho.srt')).toBeInTheDocument();
     expect(screen.getByText('候选字幕一')).toBeInTheDocument();
     expect(screen.getByText('候选字幕二')).toBeInTheDocument();
@@ -139,7 +139,7 @@ describe('OverlayApp', () => {
     fireEvent.click(screen.getAllByRole('button', { name: '写入视频' })[0]);
     expect(actions.setSubtitleWriteMode).toHaveBeenCalledWith('embedded');
 
-    fireEvent.click(screen.getByRole('button', { name: '整组优化' }));
+    fireEvent.click(screen.getByRole('button', { name: '整组转换' }));
     expect(actions.convertGroup).toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: '整组自动选字幕' }));

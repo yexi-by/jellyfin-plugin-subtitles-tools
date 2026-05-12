@@ -18,7 +18,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.SubtitlesTools.Services;
 
 /// <summary>
-/// 负责“分段字幕管理页”所需的媒体识别、纳管、兼容修复、字幕搜索、SRT 归一化以及内封/外挂写入流程。
+/// 负责”分段字幕管理页”所需的媒体识别、处理、兼容修复、字幕搜索、SRT 归一化以及内封/外挂写入流程。
 /// 当前版本只认 MKV 元数据，不再依赖任何插件侧哈希归档。
 /// </summary>
 public sealed class MultipartSubtitleManagerService
@@ -88,7 +88,7 @@ public sealed class MultipartSubtitleManagerService
     }
 
     /// <summary>
-    /// 为指定分段先确保“已纳管且已兼容”，再调用内置字幕源搜索字幕。
+    /// 为指定分段先确保”已处理且已兼容”，再调用内置字幕源搜索字幕。
     /// </summary>
     public async Task<ManagedPartSearchResponseDto> SearchPartAsync(Guid itemId, string partId, CancellationToken cancellationToken)
     {
@@ -148,7 +148,7 @@ public sealed class MultipartSubtitleManagerService
     }
 
     /// <summary>
-    /// 手动把当前分段纳管并修复到兼容安卓硬解的 MKV。
+    /// 手动把当前分段处理并修复到兼容安卓硬解的 MKV。
     /// </summary>
     public async Task<ManagedPartConvertResponseDto> ConvertPartAsync(Guid itemId, string partId, CancellationToken cancellationToken)
     {
@@ -181,7 +181,7 @@ public sealed class MultipartSubtitleManagerService
     }
 
     /// <summary>
-    /// 一键把整组分段纳管并修复到兼容安卓硬解的 MKV。
+    /// 一键把整组分段处理并修复到兼容安卓硬解的 MKV。
     /// </summary>
     public async Task<ManagedBatchOperationResponseDto> ConvertGroupAsync(
         Guid itemId,
@@ -247,7 +247,7 @@ public sealed class MultipartSubtitleManagerService
 
     /// <summary>
     /// 下载指定候选字幕，转成临时 SRT 后按模式写入当前分段。
-    /// 执行写入前会先确保当前分段已经完成纳管与兼容修复。
+    /// 执行写入前会先确保当前分段已经完成处理与兼容修复。
     /// </summary>
     public async Task<ManagedPartDownloadResponseDto> DownloadPartAsync(
         Guid itemId,
@@ -293,7 +293,7 @@ public sealed class MultipartSubtitleManagerService
 
     /// <summary>
     /// 删除当前分段中的一条插件内封字幕流。
-    /// 删除前会先确保当前分段已经纳管并可被当前插件识别。
+    /// 删除前会先确保当前分段已经处理并可被当前插件识别。
     /// </summary>
     public async Task<ManagedDeleteEmbeddedSubtitleResponseDto> DeleteEmbeddedSubtitleAsync(
         Guid itemId,
@@ -363,7 +363,7 @@ public sealed class MultipartSubtitleManagerService
 
     /// <summary>
     /// 为所有分段分别搜索并写入第一名字幕候选。
-    /// 每个分段都会先完成纳管和兼容修复，再进入字幕搜索与字幕写入。
+    /// 每个分段都会先完成处理和兼容修复，再进入字幕搜索与字幕写入。
     /// </summary>
     public async Task<ManagedBatchOperationResponseDto> DownloadBestAsync(
         Guid itemId,
