@@ -1,5 +1,9 @@
 # Jellyfin Subtitles Tools
 
+> **本项目已退役并归档。** 后续开发移至 [jellyfin-subtitles-tool](https://github.com/yexi-by/jellyfin-subtitles-tool)。
+> 新插件只在视频旁保存 CID、GCID 记录，并由用户选择、下载外挂字幕，不修改视频。
+> 本仓库保留历史代码和发布记录，不再维护；旧版的视频转换和内封行为不代表新项目的功能。
+
 > 为 Jellyfin 提供迅雷字幕搜索、下载与自动内封的字幕管理插件。
 > 单插件运行，无需外接后端。
 
